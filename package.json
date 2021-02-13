@@ -1,7 +1,7 @@
 {
   "name": "njodb",
   "version": "1.0.0",
-  "description": "A partitioned, multi-user, Node.js JSON object datastore",
+  "description": "A partitioned, multi-user-safe, Node.js JSON object datastore",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
