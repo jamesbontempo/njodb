@@ -1,189 +1,15 @@
 const fs = require("fs");
 const path = require("path");
-const rl = require("readline");
+const njodb = require("./lib/njodb");
 
 const defaults = {
     "root": "./",
     "datapath": "./data",
     "dataname": "data",
-    "datastores": 5,
-    "readlock": false,
-    "writelock": true
+    "datastores": 5
 };
 
-const insertStoreData = function(store, data) {
-    return new Promise((resolve, reject) => {
-        const start = Date.now();
-        const inserted = data.split("\n").length - 1;
-        fs.appendFile(store, data, "utf8", (error) => {
-            if (error) reject(error);
-            resolve({store: store, inserted: inserted, start: start, end: Date.now()});
-        });
-    });
-};
 
-const selectStoreData = function(store, selector) {
-    return new Promise ((resolve, reject) => {
-        const start = Date.now();
-        var selected = 0;
-        var ignored = 0;
-        var data = [];
-        if (fs.existsSync(store)) {
-            try {
-                const reader = rl.createInterface({input: fs.createReadStream(store), crlfDelay: Infinity});
-                reader.on ("line", (record) => {
-                    record = JSON.parse(record);
-                    if (selector(record)) {
-                        data.push(record);
-                        selected++;
-                    } else {
-                        ignored++;
-                    }
-                });
-                reader.on ("close", () => {
-                    resolve({store: store, data: data, selected: selected, ignored: ignored, start: start, end: Date.now()});
-                })
-            } catch (error) {
-                reject(error);
-            }
-        }
-    });
-};
-
-const deleteStoreData = function(store, selector, tempstore) {
-    return new Promise((resolve, reject) => {
-        const start = Date.now();
-        var deleted = 0;
-        var retained = 0;
-        if (fs.existsSync(store)) {
-            try {
-                const reader = rl.createInterface({input: fs.createReadStream(store), crlfDelay: Infinity});
-                const writer = fs.createWriteStream(tempstore);
-                reader.on ("line", (record) => {
-                    record = JSON.parse(record);
-                    if (!selector(record)) {
-                        writer.write(JSON.stringify(record) + "\n");
-                        retained++;
-                    } else {
-                        deleted++;
-                    }
-                });
-                reader.on ("close", () => {
-                    if (deleted > 0) {
-                        fs.rename (store, store + ".old", (error) => {
-                            if (error) reject(error);
-                            fs.rename (tempstore, store, (error) => {
-                                if (error) {
-                                    fs.rename (store + ".old", store, (error) => {
-                                        if (error) reject(error);
-                                        fs.unlink(tempstore, (error) => {
-                                            if (error) reject(error);
-                                        });
-                                    });
-                                    reject(error);
-                                }
-                                fs.unlink(store + ".old", (error) => {
-                                    if (error) reject(error);
-                                    resolve ({store: store, deleted: deleted, retained: retained, start: start, end: Date.now()});
-                                });
-                            })
-                        });
-                    } else {
-                        fs.unlink(tempstore, (error) => {
-                            if (error) reject(error);
-                            resolve ({store: store, deleted: deleted, retained: retained, start: start, end: Date.now()});
-                        });
-                    }
-                });
-            } catch (error) {
-                reject (error);
-            }
-        }
-    });
-};
-
-const updateStoreData = function(store, selector, updator, tempstore) {
-    return new Promise((resolve, reject) => {
-        const start = Date.now();
-        var updated = 0;
-        var unchanged = 0;
-        if (fs.existsSync(store)) {
-            try {
-                const reader = rl.createInterface({input: fs.createReadStream(store), crlfDelay: Infinity});
-                const writer = fs.createWriteStream(tempstore);
-                reader.on ("line", (record) => {
-                    record = JSON.parse(record);
-                    if (selector(record)) {
-                        record = updator(record);
-                        updated++;
-                    } else {
-                        unchanged++;
-                    }
-                    writer.write(JSON.stringify(record) + "\n");
-                });
-                reader.on ("close", () => {
-                    if (updated > 0) {
-                        fs.rename (store, store + ".old", (error) => {
-                            if (error) reject(error);
-                            fs.rename (tempstore, store, (error) => {
-                                if (error) {
-                                    fs.rename (store + ".old", store, (error) => {
-                                        if (error) reject(error);
-                                        fs.unlink(tempstore, (error) => {
-                                            if (error) reject(error);
-                                        });
-                                    });
-                                    reject(error);
-                                }
-                                fs.unlink(store + ".old", (error) => {
-                                    if (error) reject(error);
-                                    resolve ({store: store, updated: updated, unchanged: unchanged, start: start, end: Date.now()});
-                                });
-                            })
-                        });
-                    } else {
-                        fs.unlink(tempstore, (error) => {
-                            if (error) reject(error);
-                            resolve ({store: store, updated: updated, unchanged: unchanged, start: start, end: Date.now()});
-                        });
-                    }
-                });
-            } catch (error) {
-                reject (error);
-            }
-        }
-    });
-};
-
-const indexStoreData = function(store, field) {
-    return new Promise((resolve, reject) => {
-        const start = Date.now();
-        var line = 0;
-        var index = {};
-
-        try {
-            const readstream = rl.createInterface({input: fs.createReadStream(store), crlfDelay: Infinity});
-
-            readstream.on("line", (record) => {
-                line++;
-                record = JSON.parse(record);
-                if (record[field] !== undefined) {
-                    if (index[record[field]]) {
-                        index[record[field]].push(line);
-                    } else {
-                        index[record[field]] = [line];
-                    }
-                }
-            });
-
-            readstream.on("close", () => {
-                resolve ({store: store, field: field, index: index, start: start, end: Date.now()});
-            });
-        } catch (error) {
-            reject (error);
-        }
-    });
-}
 
 class Database {
 
@@ -208,43 +34,6 @@ class Database {
         return this.properties;
     }
 
-    insert(data) {
-        if (!Array.isArray(data) || (Array.isArray(data) && data.length === 0)) throw new Error ("Invalid data");
-
-        return new Promise((resolve, reject) => {
-            var promises = [];
-            var records = [];
-
-            for (var i = 0; i < data.length; i++) {
-                if (i === i % this.properties.datastores) records[i] = [];
-                records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
-            }
-
-            var stores = Array.from(Array(this.properties.datastores).keys());
-
-            for (var j = 0; j < records.length; j++) {
-                const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
-                const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + storenumber + ".json")
-                promises.push(insertStoreData(storepath, records[j]));
-            }
-
-            Promise.all(promises)
-                .then(results => {
-                    var inserted = 0;
-                    var start = Date.now();
-                    var end = 0;
-                    for (var i = 0; i < results.length; i++) {
-                        inserted += results[i].inserted;
-                        if (results[i].start < start) start = results[i].start;
-                        if (results[i].end > end) end = results[i].end;
-                    }
-                    resolve({inserted: inserted, start: start, end: end, details: results});
-                })
-                .catch(error => reject(error));
-        });
-
-    }
-
     select(selector) {
         if (!(selector && typeof selector === "function")) selector = function () { return true; };
 
@@ -253,7 +42,7 @@ class Database {
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + i + ".json");
-                promises.push(selectStoreData(storepath, selector));
+                promises.push(njodb.selectStoreData(storepath, selector));
             }
 
             Promise.all(promises)
@@ -276,34 +65,41 @@ class Database {
         });
     }
 
-    delete(selector) {
-        if (!(selector && typeof selector === "function")) throw new Error("selector must be defined");
+    insert(data) {
+        if (!Array.isArray(data) || (Array.isArray(data) && data.length === 0)) throw new Error ("Invalid data");
 
-        return new Promise ((resolve, reject) => {
+        return new Promise((resolve, reject) => {
             var promises = [];
+            var records = [];
 
-            for (var i = 0; i < this.properties.datastores; i++) {
-                const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(deleteStoreData(storepath, selector, tempstorepath));
+            for (var i = 0; i < data.length; i++) {
+                if (i === i % this.properties.datastores) records[i] = [];
+                records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
+            }
+
+            var stores = Array.from(Array(this.properties.datastores).keys());
+
+            for (var j = 0; j < records.length; j++) {
+                const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
+                const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + storenumber + ".json")
+                promises.push(njodb.insertStoreData(storepath, records[j]));
             }
 
             Promise.all(promises)
                 .then(results => {
-                    var deleted = 0;
-                    var retained = 0;
+                    var inserted = 0;
                     var start = Date.now();
                     var end = 0;
                     for (var i = 0; i < results.length; i++) {
-                        deleted += results[i].deleted;
-                        retained += results[i].retained;
+                        inserted += results[i].inserted;
                         if (results[i].start < start) start = results[i].start;
                         if (results[i].end > end) end = results[i].end;
                     }
-                    resolve({deleted: deleted, retained: retained, start: start, end: end, details: results})
+                    resolve({inserted: inserted, start: start, end: end, details: results});
                 })
                 .catch(error => reject(error));
         });
+
     }
 
     update(selector, updator) {
@@ -316,7 +112,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(updateStoreData(storepath, selector, updator, tempstorepath));
+                promises.push(njodb.updateStoreData(storepath, selector, updator, tempstorepath));
             }
 
             Promise.all(promises)
@@ -337,13 +133,43 @@ class Database {
         });
     }
 
+    delete(selector) {
+        if (!(selector && typeof selector === "function")) throw new Error("selector must be defined");
+
+        return new Promise ((resolve, reject) => {
+            var promises = [];
+
+            for (var i = 0; i < this.properties.datastores; i++) {
+                const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
+                const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
+                promises.push(njodb.deleteStoreData(storepath, selector, tempstorepath));
+            }
+
+            Promise.all(promises)
+                .then(results => {
+                    var deleted = 0;
+                    var retained = 0;
+                    var start = Date.now();
+                    var end = 0;
+                    for (var i = 0; i < results.length; i++) {
+                        deleted += results[i].deleted;
+                        retained += results[i].retained;
+                        if (results[i].start < start) start = results[i].start;
+                        if (results[i].end > end) end = results[i].end;
+                    }
+                    resolve({deleted: deleted, retained: retained, start: start, end: end, details: results})
+                })
+                .catch(error => reject(error));
+        });
+    }
+
     index(field) {
         return new Promise ((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                promises.push(indexStoreData(storepath, field));
+                promises.push(njodb.indexStoreData(storepath, field));
             }
 
             Promise.all(promises)
