@@ -17,7 +17,8 @@ const defaults = {
             "factor": 0.15,
             "randomize": false
         }
-    }
+    },
+    "debug": false
 };
 
 
@@ -38,11 +39,24 @@ class Database {
         if (!this.properties.dataname) this.properties.dataname = defaults.dataname;
         if (!this.properties.datastores) this.properties.datastores = defaults.datastores;
 
+        if (typeof this.properties.debug !== "boolean") this.properties.debug = defaults.debug;
+
         this.properties.lockoptions = (this.properties.lockoptions && typeof this.properties.lockoptions === "object") ? this.properties.lockoptions : defaults.lockoptions;
     }
 
     getProperties() {
         return this.properties;
+    }
+
+    getDebug() {
+        return this.properties.debug;
+    }
+
+    setDebug(debug) {
+        if (typeof debug === "boolean") {
+            this.properties.debug = debug;
+        }
+        return this.getDebug();
     }
 
     insert(data) {
@@ -62,7 +76,7 @@ class Database {
             for (var j = 0; j < records.length; j++) {
                 const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
                 const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + storenumber + ".json")
-                promises.push(njodb.insertStoreData(storepath, records[j], this.properties.lockoptions));
+                promises.push(njodb.insertStoreData(storepath, records[j], this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -90,7 +104,7 @@ class Database {
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + i + ".json");
-                promises.push(njodb.selectStoreData(storepath, selector, this.properties.lockoptions));
+                promises.push(njodb.selectStoreData(storepath, selector, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -123,7 +137,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.updateStoreData(storepath, selector, updator, tempstorepath, this.properties.lockoptions));
+                promises.push(njodb.updateStoreData(storepath, selector, updator, tempstorepath, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -153,7 +167,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.deleteStoreData(storepath, selector, tempstorepath, this.properties.lockoptions));
+                promises.push(njodb.deleteStoreData(storepath, selector, tempstorepath, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -180,7 +194,7 @@ class Database {
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                promises.push(njodb.indexStoreData(storepath, field, this.properties.lockoptions));
+                promises.push(njodb.indexStoreData(storepath, field, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
