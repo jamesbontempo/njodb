@@ -8,13 +8,13 @@ const defaults = {
     "dataname": "data",
     "datastores": 5,
     "lockoptions": {
-        "stale": 5000,
+        "stale": 2000,
         "update": 1000,
         "retries": {
-            "retries": 20,
-            "minTimeout": 1000,
-            "maxTimeout": 1000,
-            "factor": 1,
+            "retries": 5000,
+            "minTimeout": 250,
+            "maxTimeout": 5000,
+            "factor": 0.15,
             "randomize": false
         }
     }
