@@ -6,7 +6,18 @@ const defaults = {
     "root": "./",
     "datapath": "./data",
     "dataname": "data",
-    "datastores": 5
+    "datastores": 5,
+    "lockoptions": {
+        "stale": 5000,
+        "update": 1000,
+        "retries": {
+            "retries": 20,
+            "minTimeout": 1000,
+            "maxTimeout": 1000,
+            "factor": 1,
+            "randomize": false
+        }
+    }
 };
 
 
@@ -26,12 +37,49 @@ class Database {
 
         if (!this.properties.dataname) this.properties.dataname = defaults.dataname;
         if (!this.properties.datastores) this.properties.datastores = defaults.datastores;
-        if (!this.properties.readlock) this.properties.readlock = defaults.readlock;
-        if (!this.properties.writelock) this.properties.writelock = defaults.writelock;
+
+        this.properties.lockoptions = (this.properties.lockoptions && typeof this.properties.lockoptions === "object") ? this.properties.lockoptions : defaults.lockoptions;
     }
 
     getProperties() {
         return this.properties;
+    }
+
+    insert(data) {
+        if (!Array.isArray(data) || (Array.isArray(data) && data.length === 0)) throw new Error ("Invalid data");
+
+        return new Promise((resolve, reject) => {
+            var promises = [];
+            var records = [];
+
+            for (var i = 0; i < data.length; i++) {
+                if (i === i % this.properties.datastores) records[i] = [];
+                records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
+            }
+
+            var stores = Array.from(Array(this.properties.datastores).keys());
+
+            for (var j = 0; j < records.length; j++) {
+                const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
+                const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + storenumber + ".json")
+                promises.push(njodb.insertStoreData(storepath, records[j], this.properties.lockoptions));
+            }
+
+            Promise.all(promises)
+                .then(results => {
+                    var inserted = 0;
+                    var start = Date.now();
+                    var end = 0;
+                    for (var i = 0; i < results.length; i++) {
+                        inserted += results[i].inserted;
+                        if (results[i].start < start) start = results[i].start;
+                        if (results[i].end > end) end = results[i].end;
+                    }
+                    resolve({inserted: inserted, start: start, end: end, details: results});
+                })
+                .catch(error => reject(error));
+        });
+
     }
 
     select(selector) {
@@ -42,7 +90,7 @@ class Database {
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + i + ".json");
-                promises.push(njodb.selectStoreData(storepath, selector));
+                promises.push(njodb.selectStoreData(storepath, selector, this.properties.lockoptions));
             }
 
             Promise.all(promises)
@@ -65,43 +113,6 @@ class Database {
         });
     }
 
-    insert(data) {
-        if (!Array.isArray(data) || (Array.isArray(data) && data.length === 0)) throw new Error ("Invalid data");
-
-        return new Promise((resolve, reject) => {
-            var promises = [];
-            var records = [];
-
-            for (var i = 0; i < data.length; i++) {
-                if (i === i % this.properties.datastores) records[i] = [];
-                records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
-            }
-
-            var stores = Array.from(Array(this.properties.datastores).keys());
-
-            for (var j = 0; j < records.length; j++) {
-                const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
-                const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + storenumber + ".json")
-                promises.push(njodb.insertStoreData(storepath, records[j]));
-            }
-
-            Promise.all(promises)
-                .then(results => {
-                    var inserted = 0;
-                    var start = Date.now();
-                    var end = 0;
-                    for (var i = 0; i < results.length; i++) {
-                        inserted += results[i].inserted;
-                        if (results[i].start < start) start = results[i].start;
-                        if (results[i].end > end) end = results[i].end;
-                    }
-                    resolve({inserted: inserted, start: start, end: end, details: results});
-                })
-                .catch(error => reject(error));
-        });
-
-    }
-
     update(selector, updator) {
         if (!(selector && typeof selector === "function"))  throw new Error("selector must be defined");
         if (!(updator && typeof updator === "function"))  throw new Error("updator must be defined");
@@ -112,7 +123,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.updateStoreData(storepath, selector, updator, tempstorepath));
+                promises.push(njodb.updateStoreData(storepath, selector, updator, tempstorepath, this.properties.lockoptions));
             }
 
             Promise.all(promises)
@@ -142,7 +153,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.deleteStoreData(storepath, selector, tempstorepath));
+                promises.push(njodb.deleteStoreData(storepath, selector, tempstorepath, this.properties.lockoptions));
             }
 
             Promise.all(promises)
@@ -169,7 +180,7 @@ class Database {
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                promises.push(njodb.indexStoreData(storepath, field));
+                promises.push(njodb.indexStoreData(storepath, field, this.properties.lockoptions));
             }
 
             Promise.all(promises)
