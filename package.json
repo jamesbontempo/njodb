@@ -1,6 +1,6 @@
 {
   "name": "njodb",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A partitioned, multi-user-safe, Node.js JSON object datastore",
   "main": "index.js",
   "scripts": {
