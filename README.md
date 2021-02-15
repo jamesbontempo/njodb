@@ -35,17 +35,17 @@ Insert them into the database:
 db.insert(data);
 ```
 
-Select some records from the database by supplying a function find matches:
+Select some records from the database by supplying a function to find matches:
 ```js
 db.select(function(record) { return record.id === 1 || record.name === "Steve"});
 ```
 
-Update some records in the database by supplying a function find matches and another function to update them:
+Update some records in the database by supplying a function to find matches and another function to update them:
 ```js
 db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog" });
 ```
 
-Delete some records from the database by supplying a function find matches:
+Delete some records from the database by supplying a function to find matches:
 ```js
 db.delete(function(record) { return record.modified < Date.now()});
 ```
