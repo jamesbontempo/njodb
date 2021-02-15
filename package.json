@@ -1,7 +1,7 @@
 {
   "name": "njodb",
-  "version": "0.1.11",
-  "description": "A partitioned, multi-user-safe, Node.js JSON object database",
+  "version": "0.1.12",
+  "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
     "lib": "lib"

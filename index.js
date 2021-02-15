@@ -6,6 +6,7 @@ const defaults = {
     "datadir": "data",
     "dataname": "data",
     "datastores": 5,
+    "tempdir": "tmp",
     "lockoptions": {
         "stale": 5000,
         "update": 1000,
@@ -38,6 +39,7 @@ class Database {
             if (!fs.existsSync(root)) {
                 fs.mkdirSync(root);
                 fs.mkdirSync(path.join(root, defaults.datadir));
+                fs.mkdirSync(path.join(root, defaults.tempdir));
             }
             fs.writeFileSync(propertiesFile, JSON.stringify(defaults, null, 4));
             this.properties = defaults;
@@ -45,6 +47,7 @@ class Database {
 
         this.properties.root = root;
         this.properties.datapath = path.join(root, this.properties.datadir);
+        this.properties.temppath = path.join(root, this.properties.tempdir);
     }
 
     getProperties() {
@@ -57,6 +60,7 @@ class Database {
         if (!(properties.datadir && typeof properties.datadir === "string")) this.properties.datadir = defaults.datadir;
         if (!(properties.dataname && typeof properties.dataname === "string")) this.properties.dataname = defaults.dataname;
         if (!(properties.datastores && typeof properties.datastores === "number")) this.properties.datastores = defaults.datastores;
+        if (!(properties.tempdir && typeof properties.tempdir === "string")) this.properties.tempdir = defaults.tempdir;
         if (!(properties.debug && typeof properties.debug === "boolean")) this.properties.debug = defaults.debug;
         this.properties.lockoptions = (properties.lockoptions && typeof this.properties.lockoptions === "object") ? properties.lockoptions : defaults.lockoptions;
 
@@ -151,7 +155,7 @@ class Database {
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
+                const tempstorepath = path.join(this.properties.temppath, [this.properties.dataname, i, Date.now(), "json"].join("."));
                 promises.push(njodb.updateStoreData(storepath, selector, updator, tempstorepath, this.properties.lockoptions, this.properties.debug));
             }
 
@@ -181,7 +185,7 @@ class Database {
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                const tempstorepath = path.join(this.properties.datapath, [this.properties.dataname, i, Date.now(), "json"].join("."));
+                const tempstorepath = path.join(this.properties.temppath, [this.properties.dataname, i, Date.now(), "json"].join("."));
                 promises.push(njodb.deleteStoreData(storepath, selector, tempstorepath, this.properties.lockoptions, this.properties.debug));
             }
 

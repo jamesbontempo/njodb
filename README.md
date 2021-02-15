@@ -1,6 +1,6 @@
 # njodb
 
-`njodb` is a partitioned, multi-user-safe, Node.js JSON object database. Data is distributed across multiple files that are protected by read and write locks.
+`njodb` is a persistent, partitioned, concurrency-controlled, Node.js JSON object database. Data is written to the file system, distributed across multiple files that are protected by read and write locks.
 
 ## Table of contents
 - [Introduction](#introduction)
@@ -95,6 +95,7 @@ Name|Type|Description|Default
 `datadir`|string|The name of the subdirectory of `root` where data files will be stored|`data`
 `dataname`|string|The file name that will be used when creating or accessing data files|`data`
 `datastores`|number|The number of data stores, or data partitions, that will be used|`5`
+`tempdir`|string|The name of the subdirectory of `root` where temporary data files will be stored|`tmp`
 `lockoptions`|object|The options that will be used by [proper-lockfile](https://www.npmjs.com/package/proper-lockfile) to lock data files|`{"stale": 5000, "update": 1000, "retries": { "retries": 5000, "minTimeout": 250, "maxTimeout": 5000, "factor": 0.15, "randomize": false } }`
 `debug`|boolean|Whether to print out debugging information to the console|`false`
 
