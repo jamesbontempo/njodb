@@ -3,12 +3,11 @@ const path = require("path");
 const njodb = require("./lib/njodb");
 
 const defaults = {
-    "root": "./",
-    "datapath": "./data",
+    "datadir": "data",
     "dataname": "data",
     "datastores": 5,
     "lockoptions": {
-        "stale": 2000,
+        "stale": 5000,
         "update": 1000,
         "retries": {
             "retries": 5000,
@@ -28,20 +27,32 @@ class Database {
     constructor(root) {
         this.properties = {};
 
-        root = (root && typeof root === "string" && root.length > 0) ? root : defaults.root;
+        root = (root && typeof root === "string" && root.length > 0) ? root :".";
 
-        this.properties = JSON.parse(fs.readFileSync(path.join(root, "nodedb.properties")));
+        const propertiesFile = path.join(root, "nodedb.properties");
+
+        if (fs.existsSync(propertiesFile)) {
+            this.properties = JSON.parse(fs.readFileSync(propertiesFile));
+
+            if (!this.properties.datadir) this.properties.datadir = defaults.datadir;
+
+            if (!this.properties.dataname) this.properties.dataname = defaults.dataname;
+            if (!this.properties.datastores) this.properties.datastores = defaults.datastores;
+
+            if (this.properties.debug && typeof this.properties.debug !== "boolean") this.properties.debug = defaults.debug;
+
+            this.properties.lockoptions = (this.properties.lockoptions && typeof this.properties.lockoptions === "object") ? this.properties.lockoptions : defaults.lockoptions;
+        } else {
+            if (!fs.existsSync(root)) {
+                fs.mkdirSync(root);
+                fs.mkdirSync(path.join(root, defaults.datadir));
+            }
+            fs.writeFileSync(propertiesFile, JSON.stringify(defaults, null, 4));
+            this.properties = defaults;
+        }
+
         this.properties.root = root;
-
-        if (!this.properties.datadir) this.properties.datadir = defaults.datadir;
-        this.properties.datapath = path.join(this.properties.root, this.properties.datadir);
-
-        if (!this.properties.dataname) this.properties.dataname = defaults.dataname;
-        if (!this.properties.datastores) this.properties.datastores = defaults.datastores;
-
-        if (typeof this.properties.debug !== "boolean") this.properties.debug = defaults.debug;
-
-        this.properties.lockoptions = (this.properties.lockoptions && typeof this.properties.lockoptions === "object") ? this.properties.lockoptions : defaults.lockoptions;
+        this.properties.datapath = path.join(root, this.properties.datadir);
     }
 
     getProperties() {
