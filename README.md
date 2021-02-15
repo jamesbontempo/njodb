@@ -58,7 +58,7 @@ db.select(function(record) { return record.id === 1 || record.name === "Steve"})
 
 Update some records in the database by supplying a function to find matches and another function to update them:
 ```js
-db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog" });
+db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog"; return record; });
 ```
 
 Delete some records from the database by supplying a function to find matches:
