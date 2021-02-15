@@ -29,7 +29,7 @@ class Database {
 
         root = (root && typeof root === "string" && root.length > 0) ? root :".";
 
-        const propertiesFile = path.join(root, "nodedb.properties");
+        const propertiesFile = path.join(root, "njodb.properties");
 
         if (fs.existsSync(propertiesFile)) {
             this.properties = JSON.parse(fs.readFileSync(propertiesFile));
