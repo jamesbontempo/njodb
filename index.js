@@ -32,16 +32,8 @@ class Database {
         const propertiesFile = path.join(root, "njodb.properties");
 
         if (fs.existsSync(propertiesFile)) {
-            this.properties = JSON.parse(fs.readFileSync(propertiesFile));
-
-            if (!this.properties.datadir) this.properties.datadir = defaults.datadir;
-
-            if (!this.properties.dataname) this.properties.dataname = defaults.dataname;
-            if (!this.properties.datastores) this.properties.datastores = defaults.datastores;
-
-            if (this.properties.debug && typeof this.properties.debug !== "boolean") this.properties.debug = defaults.debug;
-
-            this.properties.lockoptions = (this.properties.lockoptions && typeof this.properties.lockoptions === "object") ? this.properties.lockoptions : defaults.lockoptions;
+            const properties = JSON.parse(fs.readFileSync(propertiesFile));
+            this.setProperties(properties);
         } else {
             if (!fs.existsSync(root)) {
                 fs.mkdirSync(root);
@@ -59,12 +51,24 @@ class Database {
         return this.properties;
     }
 
+    setProperties(properties) {
+        if (properties && typeof properties === "object") this.properties = properties;
+
+        if (!(properties.datadir && typeof properties.datadir === "string")) this.properties.datadir = defaults.datadir;
+        if (!(properties.dataname && typeof properties.dataname === "string")) this.properties.dataname = defaults.dataname;
+        if (!(properties.datastores && typeof properties.datastores === "number")) this.properties.datastores = defaults.datastores;
+        if (!(properties.debug && typeof properties.debug === "boolean")) this.properties.debug = defaults.debug;
+        this.properties.lockoptions = (properties.lockoptions && typeof this.properties.lockoptions === "object") ? properties.lockoptions : defaults.lockoptions;
+
+        return this.properties;
+    }
+
     getDebug() {
         return this.properties.debug;
     }
 
     setDebug(debug) {
-        if (typeof debug === "boolean") {
+        if (debug && typeof debug === "boolean") {
             this.properties.debug = debug;
         }
         return this.getDebug();
