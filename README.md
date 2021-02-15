@@ -1,6 +1,6 @@
 # njodb
 
-`njodb` is a partitioned, multi-user-safe, Node.js JSON object datastore.
+`njodb` is a partitioned, multi-user-safe, Node.js JSON object database. Data is distributed across multiple files that are protected by read and write locks.
 
 ## Table of contents
 - [Introduction](#introduction)
@@ -73,9 +73,17 @@ Parameters:
 
 Name|Type|Description|Default
 ----|----|-----------|-------
-`root`|string|path to the root directory of the database|`.`
+`root`|string|path to the root directory of the `Database`|`.`
 
-If the `root` directory does not exist it will be created.
+If the `root` directory does not exist it will be created, along with a default `njodb.properties` file and a default data directory (See [Database properties](#database-properties) below).
+
+Example:
+
+```js
+const db = new njodb.Database() // created in the current directory
+
+const db = new njodb.Databas("/path/to/some/other/place")
+```
 
 ### Database properties
 An NJODB `Database` has several properties that control its functioning. These properties can be set explicitly in the `njodb.properties` file in the `root` directory; otherwise, default properties will be used. For a newly created `Database`, an `njodb.properties` file will be created using default values.
@@ -89,6 +97,7 @@ Name|Type|Description|Default
 `datastores`|number|The number of data stores, or data partitions, that will be used|`5`
 `lockoptions`|object|The options that will be used by [proper-lockfile](https://www.npmjs.com/package/proper-lockfile) to lock data files|`{"stale": 5000, "update": 1000, "retries": { "retries": 5000, "minTimeout": 250, "maxTimeout": 5000, "factor": 0.15, "randomize": false } }`
 `debug`|boolean|Whether to print out debugging information to the console|`false`
+
 
 ## Basic Methods
 
@@ -122,6 +131,8 @@ Name|Type|Description|Default
 
 ## Data manipulation methods
 
+All data manipulation methods are asynchronous and return a `Promise`.
+
 ### insert
 
 Inserts data into the `Database`.
@@ -130,7 +141,16 @@ Parameters:
 
 Name|Type|Description
 ----|----|-----------
-`data`|array|An array of JSON objects to insert into the database
+`data`|array|An array of JSON objects to insert into the `Database`
+
+Resolves with an object containing results from the `insert`:
+
+Name|Type|Description
+----|----|-----------
+`inserted`|number|The number of objects inserted into the `Database`
+`start`|date|The timestamp of when the insertions began
+`end`|date|The timestamp of when the insertions finished
+`details`|array|An array of insertion results for each individual `datastore`
 
 ### select
 
@@ -141,6 +161,17 @@ Parameters:
 Name|Type|Description
 ----|----|-----------
 `selecter`|function|A function that returns a boolean that will be used to identify the records that should be returned
+
+Resolves with an object containing results from the `select`:
+
+Name|Type|Description
+----|----|-----------
+`data`|array|An array of objects selected from the `Database`
+`selected`|number|The number of objects selected from the `Database`
+`ignored`|number|The number of objects that were not selected from the `Database`
+`start`|date|The timestamp of when the insertions began
+`end`|date|The timestamp of when the insertions finished
+`details`|array|An array of selection results for each individual `datastore`
 
 ### update
 
@@ -153,6 +184,16 @@ Name|Type|Description
 `selecter`|function|A function that returns a boolean that will be used to identify the records that should be updated
 `updater`|function|A function that applies an update to a selected record and returns it
 
+Resolves with an object containing results from the `update`:
+
+Name|Type|Description
+----|----|-----------
+`updated`|number|The number of objects updated in the `Database`
+`unchanged`|number|The number of objects that were not updated in the `Database`
+`start`|date|The timestamp of when the insertions began
+`end`|date|The timestamp of when the insertions finished
+`details`|array|An array of update results for each individual `datastore`
+
 ### delete
 
 Deletes data from the `Database`.
@@ -162,4 +203,15 @@ Parameters:
 Name|Type|Description
 ----|----|-----------
 `selecter`|function|A function that returns a boolean that will be used to identify the records that should be deleted
+
+Resolves with an object containing results from the `delete`:
+
+Name|Type|Description
+----|----|-----------
+`deleted`|number|The number of objects deleted from the `Database`
+`retained`|number|The number of objects that were not deleted from the `Database`
+`start`|date|The timestamp of when the insertions began
+`end`|date|The timestamp of when the insertions finished
+`details`|array|An array of deletion results for each individual `datastore`
+
 
