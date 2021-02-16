@@ -3,6 +3,8 @@
 `njodb` is a persistent, partitioned, concurrency-controlled, Node.js JSON object database. Data is written to the file system, distributed across multiple files that are protected by read and write locks.
 
 ## Table of contents
+- [Install](#install)
+- [Test](#test)
 - [Introduction](#introduction)
 - [Constructor](#constructor)
   - [Database properties](#database-properties)
@@ -16,6 +18,16 @@
   - [select](#select)
   - [update](#update)
   - [delete](#delete)
+
+## Install
+```js
+npm install njodb
+```
+
+## Test
+```js
+npm test
+```
 
 ## Introduction
 Load the module:

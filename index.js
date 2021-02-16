@@ -28,26 +28,25 @@ class Database {
     constructor(root) {
         this.properties = {};
 
-        root = (root && typeof root === "string" && root.length > 0) ? root :".";
+        root = (root && typeof root === "string" && root.length > 0) ? root : __dirname;
 
         const propertiesFile = path.join(root, "njodb.properties");
 
         if (fs.existsSync(propertiesFile)) {
-            const properties = JSON.parse(fs.readFileSync(propertiesFile));
-            this.setProperties(properties);
+            this.setProperties(JSON.parse(fs.readFileSync(propertiesFile)));
         } else {
-            if (!fs.existsSync(root)) {
-                fs.mkdirSync(root);
-                fs.mkdirSync(path.join(root, defaults.datadir));
-                fs.mkdirSync(path.join(root, defaults.tempdir));
-            }
+            if (!fs.existsSync(root)) fs.mkdirSync(root);
             fs.writeFileSync(propertiesFile, JSON.stringify(defaults, null, 4));
             this.properties = defaults;
         }
 
         this.properties.root = root;
+
         this.properties.datapath = path.join(root, this.properties.datadir);
         this.properties.temppath = path.join(root, this.properties.tempdir);
+
+        if (!fs.existsSync(this.properties.datapath)) fs.mkdirSync(this.properties.datapath);
+        if (!fs.existsSync(this.properties.temppath)) fs.mkdirSync(this.properties.temppath);
     }
 
     getProperties() {

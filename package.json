@@ -1,13 +1,13 @@
 {
   "name": "njodb",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
     "lib": "lib"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha"
   },
   "repository": {
     "type": "git",
@@ -16,7 +16,7 @@
   "keywords": [
     "JSON",
     "object",
-    "datastore"
+    "database"
   ],
   "author": {
     "name": "James BonTempo",
@@ -27,6 +27,8 @@
     "eslint": "^7.19.0"
   },
   "dependencies": {
+    "chai": "^4.3.0",
+    "mocha": "^8.3.0",
     "proper-lockfile": "^4.1.2"
   }
 }
