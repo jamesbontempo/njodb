@@ -28,7 +28,7 @@ class Database {
     constructor(root) {
         this.properties = {};
 
-        root = (root && typeof root === "string" && root.length > 0) ? root : __dirname;
+        root = (root && typeof root === "string" && root.length > 0) ? root : process.cwd();
 
         const propertiesFile = path.join(root, "njodb.properties");
 
@@ -114,15 +114,15 @@ class Database {
 
     }
 
-    select(selector) {
-        if (!(selector && typeof selector === "function")) selector = function () { return true; };
+    select(selecter) {
+        if (!(selecter && typeof selecter === "function")) selecter = function () { return true; };
 
         return new Promise((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + i + ".json");
-                promises.push(njodb.selectStoreData(storepath, selector, this.properties.lockoptions, this.properties.debug));
+                promises.push(njodb.selectStoreData(storepath, selecter, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -145,8 +145,8 @@ class Database {
         });
     }
 
-    update(selector, updator) {
-        if (!(selector && typeof selector === "function"))  throw new Error("selector must be defined");
+    update(selecter, updator) {
+        if (!(selecter && typeof selecter === "function"))  throw new Error("selecter must be defined");
         if (!(updator && typeof updator === "function"))  throw new Error("updator must be defined");
 
         return new Promise ((resolve, reject) => {
@@ -155,7 +155,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.temppath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.updateStoreData(storepath, selector, updator, tempstorepath, this.properties.lockoptions, this.properties.debug));
+                promises.push(njodb.updateStoreData(storepath, selecter, updator, tempstorepath, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -176,8 +176,8 @@ class Database {
         });
     }
 
-    delete(selector) {
-        if (!(selector && typeof selector === "function")) throw new Error("selector must be defined");
+    delete(selecter) {
+        if (!(selecter && typeof selecter === "function")) throw new Error("selecter must be defined");
 
         return new Promise ((resolve, reject) => {
             var promises = [];
@@ -185,7 +185,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.temppath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.deleteStoreData(storepath, selector, tempstorepath, this.properties.lockoptions, this.properties.debug));
+                promises.push(njodb.deleteStoreData(storepath, selecter, tempstorepath, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
