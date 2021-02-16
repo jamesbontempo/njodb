@@ -1,7 +1,6 @@
 const njodb = require("../index");
 const fs = require("fs");
 const path = require("path");
-const lockfile = require("proper-lockfile");
 const expect = require("chai").expect;
 
 const defaults = {
