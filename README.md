@@ -87,7 +87,7 @@ Name|Type|Description|Default
 ----|----|-----------|-------
 `root`|string|path to the root directory of the `Database`|`.`
 
-If the `root` directory does not exist it will be created, along with a default `njodb.properties` file and a default data directory (See [Database properties](#database-properties) below).
+If the `root` directory does not exist it will be created, along with a default `njodb.properties` file and default data and temp directories (See [Database properties](#database-properties) below).
 
 Example:
 
