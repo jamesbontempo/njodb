@@ -32,12 +32,14 @@ const data = [
         id: 1,
         name: "James",
         nickname: "Good Times",
+        favoriteNumber: 7,
         modified: modified
     },
     {
         id: 2,
         name: "Steve",
         nickname: "Esteban",
+        favoriteNumber: 13,
         modified: modified + 1
     }
 ];
@@ -47,13 +49,14 @@ const update = [
         id: 1,
         name: "James",
         nickname: "Bulldog",
+        favoriteNumber: 5,
         modified: modified
     }
 ];
 
 const db = new njodb.Database(__dirname);
 
-describe("NJODB Tests", function() {
+describe("NJODB tests", function() {
 
     it("Constructor", function() {
         expect(db.getProperties()).to.deep.equal(defaults);
@@ -77,7 +80,7 @@ describe("NJODB Tests", function() {
     });
 
     it("Update", function() {
-        db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog"; return record; }).then(results => {
+        db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog"; record.favoriteNumber = 7; return record; }).then(results => {
             expect(results.updated).to.equal(1);
             expect(results.unchanged).to.equal(1);
             db.select(function(record) { return record.id === 1 }).then(results => {
@@ -100,10 +103,21 @@ describe("NJODB Tests", function() {
         });
     })
 
-    after(function() {
-        fs.unlinkSync(path.join(defaults.root, "njodb.properties"));
-        fs.rmdirSync(path.join(defaults.root, "data"), {recursive: true});
+});
+
+describe("Trying to clean up", function() {
+
+    it("Deleting tmp files", function() {
         fs.rmdirSync(path.join(defaults.root, "tmp"), {recursive: true});
     });
+
+    it("Deleting data files", function() {
+        fs.rmdirSync(path.join(defaults.root, "data"), {recursive: true});
+    });
+
+    it("Deleting properties file", function() {
+        fs.unlinkSync(path.join(defaults.root, "njodb.properties"));
+    });
+
 });
 

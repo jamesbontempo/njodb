@@ -29,6 +29,8 @@ npm install njodb
 npm test
 ```
 
+The test will try to clean up after itself by removing any files or directories it creates, but sometimes this fails. If it does fail, it's often with the error "ENOENT: no such file or directory." This is likely due to a race condition that arises somewhere within the call to `fs.rmdirSync`. A failure within this part of the test does not mean that there is a problem with the module, only that the test wasn't able to clean up after itself.
+
 ## Introduction
 Load the module:
 ```js
