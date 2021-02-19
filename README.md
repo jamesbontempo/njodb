@@ -8,7 +8,7 @@
 - [Introduction](#introduction)
 - [Constructor](#constructor)
   - [Database properties](#database-properties)
-- [Basic Methods](#basic-methods)
+- [Basic methods](#basic-methods)
   - [getProperties](#getproperties)
   - [setProperties](#setproperties)
   - [getDebug](#getdebug)
@@ -85,7 +85,7 @@ Parameters:
 
 Name|Type|Description|Default
 ----|----|-----------|-------
-`root`|string|path to the root directory of the `Database`|`.`
+`root`|string|path to the root directory of the `Database`|`process.cwd()`
 
 If the `root` directory does not exist it will be created, along with a default `njodb.properties` file and default data and temp directories (See [Database properties](#database-properties) below).
 
@@ -112,7 +112,7 @@ Name|Type|Description|Default
 `debug`|boolean|Whether to print out debugging information to the console|`false`
 
 
-## Basic Methods
+## Basic methods
 
 ### getProperties
 
