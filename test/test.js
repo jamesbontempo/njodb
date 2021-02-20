@@ -32,6 +32,7 @@ const data = [
         id: 1,
         name: "James",
         nickname: "Good Times",
+        state: "Maryland",
         favoriteNumber: 7,
         modified: modified
     },
@@ -39,8 +40,20 @@ const data = [
         id: 2,
         name: "Steve",
         nickname: "Esteban",
+        state: "Maryland",
         favoriteNumber: 13,
         modified: modified + 1
+    }
+];
+
+const selectProjection = [
+    {
+        nickname: "Good Times",
+        newFavoriteNumber: 7 * 5,
+    },
+    {
+        nickname: "Esteban",
+        newFavoriteNumber: 13 * 5,
     }
 ];
 
@@ -49,6 +62,7 @@ const update = [
         id: 1,
         name: "James",
         nickname: "Bulldog",
+        state: "Maryland",
         favoriteNumber: 5,
         modified: modified
     }
@@ -65,18 +79,23 @@ describe("NJODB tests", function() {
         expect(fs.existsSync(path.join(defaults.root, "tmp"))).to.equal(true);
     });
 
-    it("Insert", function() {
-        db.insert(data).then(results => {
-            expect(results.inserted).to.equal(2);
-        });
+    it("Insert", async () => {
+        const results = await db.insert(data);
+        expect(results.inserted).to.equal(2);
     });
 
-    it("Select", function() {
-        db.select(function(record) { return record.id === 1 || record.name === "Steve"}).then(results => {
-            expect(results.data).to.deep.equal(data);
-            expect(results.selected).to.equal(2);
-            expect(results.ignored).to.equal(0);
-        });
+    it("Select", async () => {
+        const results = await db.select(function(record) { return record.id === 1 || record.name === "Steve"});
+        expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(data);
+        expect(results.selected).to.equal(2);
+        expect(results.ignored).to.equal(0);
+    });
+
+    it("Select with projection", async () => {
+        const results = await db.select(function(record) { return record.id === 1 || record.name === "Steve"}, function(record) { return {nickname: record.nickname, newFavoriteNumber: record.favoriteNumber * 5} });
+        expect(results.data.sort((a, b) => a.newFavoriteNumber - b.newFavoriteNumber)).to.deep.equal(selectProjection);
+        expect(results.selected).to.equal(2);
+        expect(results.ignored).to.equal(0);
     });
 
     it("Update", function() {
@@ -107,16 +126,16 @@ describe("NJODB tests", function() {
 
 describe("Trying to clean up", function() {
 
+    it("Deleting properties file", function() {
+        fs.unlinkSync(path.join(defaults.root, "njodb.properties"));
+    });
+
     it("Deleting tmp files", function() {
         fs.rmdirSync(path.join(defaults.root, "tmp"), {recursive: true});
     });
 
     it("Deleting data files", function() {
         fs.rmdirSync(path.join(defaults.root, "data"), {recursive: true});
-    });
-
-    it("Deleting properties file", function() {
-        fs.unlinkSync(path.join(defaults.root, "njodb.properties"));
     });
 
 });

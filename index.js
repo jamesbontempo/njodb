@@ -77,7 +77,11 @@ class Database {
         return this.getDebug();
     }
 
-    insert(data) {
+    getStats() {
+        // return stats about datastores (names, filesize, number of records, etc.)
+    }
+
+    async insert(data) {
         if (!Array.isArray(data) || (Array.isArray(data) && data.length === 0)) throw new Error ("Invalid data");
 
         return new Promise((resolve, reject) => {
@@ -114,15 +118,16 @@ class Database {
 
     }
 
-    select(selecter) {
-        if (!(selecter && typeof selecter === "function")) selecter = function () { return true; };
+    async select(selecter, projecter) {
+        if (!(selecter && typeof selecter === "function"))  throw new Error("selecter must be defined and must be a function");
+        if (projecter && typeof projecter !== "function")  throw new Error("projecter must be a function");
 
         return new Promise((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + i + ".json");
-                promises.push(njodb.selectStoreData(storepath, selecter, this.properties.lockoptions, this.properties.debug));
+                promises.push(njodb.selectStoreData(storepath, selecter, projecter, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -141,13 +146,13 @@ class Database {
                     }
                     resolve({data: data, selected: selected, ignored: ignored, start: start, end: end, details: results})
                 })
-                .catch(error => reject(error));
+                .catch(error => {console.log(error); reject(error)});
         });
     }
 
-    update(selecter, updator) {
-        if (!(selecter && typeof selecter === "function"))  throw new Error("selecter must be defined");
-        if (!(updator && typeof updator === "function"))  throw new Error("updator must be defined");
+    async update(selecter, updater) {
+        if (!(selecter && typeof selecter === "function"))  throw new Error("selecter must be defined and must be a function");
+        if (!(updater && typeof updater === "function"))  throw new Error("updater must be defined and must be a function");
 
         return new Promise ((resolve, reject) => {
             var promises = [];
@@ -155,7 +160,7 @@ class Database {
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
                 const tempstorepath = path.join(this.properties.temppath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.updateStoreData(storepath, selecter, updator, tempstorepath, this.properties.lockoptions, this.properties.debug));
+                promises.push(njodb.updateStoreData(storepath, selecter, updater, tempstorepath, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
@@ -176,8 +181,8 @@ class Database {
         });
     }
 
-    delete(selecter) {
-        if (!(selecter && typeof selecter === "function")) throw new Error("selecter must be defined");
+    async delete(selecter) {
+        if (!(selecter && typeof selecter === "function")) throw new Error("selecter must be defined and must be a function");
 
         return new Promise ((resolve, reject) => {
             var promises = [];
@@ -206,71 +211,76 @@ class Database {
         });
     }
 
-    aggregate(selecter, indexer, field) {
-        if (!(selecter && typeof selecter === "function")) throw new Error("selecter must be defined");
-        if (!(indexer && typeof indexer === "function")) throw new Error("indexer must be defined");
+    async aggregate(selecter, indexer, projecter) {
+        if (!(selecter && typeof selecter === "function")) throw new Error("selecter must be defined and must be a function");
+        if (!(indexer && typeof indexer === "function")) throw new Error("indexer must be defined and must be a function");
+        if (!(projecter && typeof projecter === "function")) throw new Error("projecter must be defined and must be a function");
 
         return new Promise ((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                promises.push(njodb.aggregateStoreData(storepath, selecter, indexer, field, this.properties.lockoptions, this.properties.debug));
+                promises.push(njodb.aggregateStoreData(storepath, selecter, indexer, projecter, this.properties.lockoptions, this.properties.debug));
             }
 
             Promise.all(promises)
                 .then(results => {
-                    var aggregate = {};
+                    var aggregates = {};
                     var start = Date.now();
                     var end = 0;
                     for (var i = 0; i < results.length; i++) {
-                        const indexes = Object.keys(results[i].aggregate);
+                        const indexes = Object.keys(results[i].aggregates);
                         for (var j = 0; j < indexes.length; j++) {
-                            if (aggregate[indexes[j]]) {
-                                if (results[i].aggregate[indexes[j]]["min"] < aggregate[indexes[j]]["min"]) aggregate[indexes[j]]["min"] = results[i].aggregate[indexes[j]]["min"];
-                                if (results[i].aggregate[indexes[j]]["max"] > aggregate[indexes[j]]["max"]) aggregate[indexes[j]]["max"] = results[i].aggregate[indexes[j]]["max"];
-                                if (results[i].aggregate[indexes[j]]["m2"] !== undefined) {
-                                    const n = aggregate[indexes[j]]["count"] + results[i].aggregate[indexes[j]]["count"];
-                                    const delta = results[i].aggregate[indexes[j]]["mean"] - aggregate[indexes[j]]["mean"];
-                                    const m2 = aggregate[indexes[j]]["m2"] + results[i].aggregate[indexes[j]]["m2"] + (Math.pow(delta, 2) * ((aggregate[indexes[j]]["count"] * results[i].aggregate[indexes[j]]["count"]) / n));
-                                    aggregate[indexes[j]]["m2"] = m2;
-                                    aggregate[indexes[j]]["varp"] = m2 / n;
-                                    aggregate[indexes[j]]["vars"] = m2 / (n - 1);
-                                    aggregate[indexes[j]]["stdp"] = Math.sqrt(m2 / n);
-                                    aggregate[indexes[j]]["stds"] = Math.sqrt(m2 / (n - 1));
+                            const fields = Object.keys(results[i].aggregates[indexes[j]]);
+                            for (var k = 0; k < fields.length; k++) {
+                                if (!aggregates[indexes[j]]) aggregates[indexes[j]] = {};
+                                if (aggregates[indexes[j]][fields[k]]) {
+                                    if (results[i].aggregates[indexes[j]][fields[k]]["min"] < aggregates[indexes[j]][fields[k]]["min"]) aggregates[indexes[j]][fields[k]]["min"] = results[i].aggregates[indexes[j]][fields[k]]["min"];
+                                    if (results[i].aggregates[indexes[j]][fields[k]]["max"] > aggregates[indexes[j]][fields[k]]["max"]) aggregates[indexes[j]][fields[k]]["max"] = results[i].aggregates[indexes[j]][fields[k]]["max"];
+                                    if (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) {
+                                        const n = aggregates[indexes[j]][fields[k]]["count"] + results[i].aggregates[indexes[j]][fields[k]]["count"];
+                                        const delta = results[i].aggregates[indexes[j]][fields[k]]["mean"] - aggregates[indexes[j]][fields[k]]["mean"];
+                                        const m2 = aggregates[indexes[j]][fields[k]]["m2"] + results[i].aggregates[indexes[j]][fields[k]]["m2"] + (Math.pow(delta, 2) * ((aggregates[indexes[j]][fields[k]]["count"] * results[i].aggregates[indexes[j]][fields[k]]["count"]) / n));
+                                        aggregates[indexes[j]][fields[k]]["m2"] = m2;
+                                        aggregates[indexes[j]][fields[k]]["varp"] = m2 / n;
+                                        aggregates[indexes[j]][fields[k]]["vars"] = m2 / (n - 1);
+                                        aggregates[indexes[j]][fields[k]]["stdp"] = Math.sqrt(m2 / n);
+                                        aggregates[indexes[j]][fields[k]]["stds"] = Math.sqrt(m2 / (n - 1));
+                                    }
+                                    if (results[i].aggregates[indexes[j]][fields[k]]["sum"] !== undefined) {
+                                        aggregates[indexes[j]][fields[k]]["mean"] = (aggregates[indexes[j]][fields[k]]["sum"] + results[i].aggregates[indexes[j]][fields[k]]["sum"]) / (aggregates[indexes[j]][fields[k]]["count"] + results[i].aggregates[indexes[j]][fields[k]]["count"]);
+                                        aggregates[indexes[j]][fields[k]]["sum"] += results[i].aggregates[indexes[j]][fields[k]]["sum"];
+                                    }
+                                    aggregates[indexes[j]][fields[k]]["count"] += results[i].aggregates[indexes[j]][fields[k]]["count"];
+                                } else {
+                                    aggregates[indexes[j]][fields[k]] = {
+                                        field: results[i].aggregates[indexes[j]][fields[k]]["field"],
+                                        min: results[i].aggregates[indexes[j]][fields[k]]["min"],
+                                        max: results[i].aggregates[indexes[j]][fields[k]]["max"],
+                                        count: results[i].aggregates[indexes[j]][fields[k]]["count"],
+                                        sum:  (results[i].aggregates[indexes[j]][fields[k]]["sum"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["sum"] : undefined,
+                                        mean:  (results[i].aggregates[indexes[j]][fields[k]]["mean"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["mean"] : undefined,
+                                        varp: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["m2"] / results[i].aggregates[indexes[j]][fields[k]]["count"] : undefined,
+                                        vars: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["m2"] / (results[i].aggregates[indexes[j]][fields[k]]["count"] - 1) : undefined,
+                                        stdp: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? Math.sqrt(results[i].aggregates[indexes[j]][fields[k]]["m2"] / results[i].aggregates[indexes[j]][fields[k]]["count"]) : undefined,
+                                        stds: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? Math.sqrt(results[i].aggregates[indexes[j]][fields[k]]["m2"] / (results[i].aggregates[indexes[j]][fields[k]]["count"] - 1)) : undefined,
+                                        m2: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["m2"] : undefined
+                                    };
                                 }
-                                if (results[i].aggregate[indexes[j]]["sum"] !== undefined) {
-                                    aggregate[indexes[j]]["mean"] = (aggregate[indexes[j]]["sum"] + results[i].aggregate[indexes[j]]["sum"]) / (aggregate[indexes[j]]["count"] + results[i].aggregate[indexes[j]]["count"]);
-                                    aggregate[indexes[j]]["sum"] += results[i].aggregate[indexes[j]]["sum"];
-                                }
-                                aggregate[indexes[j]]["count"] += results[i].aggregate[indexes[j]]["count"];
-                            } else {
-                                aggregate[indexes[j]] = {
-                                    field: results[i].aggregate[indexes[j]]["field"],
-                                    min: results[i].aggregate[indexes[j]]["min"],
-                                    max: results[i].aggregate[indexes[j]]["max"],
-                                    count: results[i].aggregate[indexes[j]]["count"],
-                                    sum:  (results[i].aggregate[indexes[j]]["sum"] !== undefined) ? results[i].aggregate[indexes[j]]["sum"] : undefined,
-                                    mean:  (results[i].aggregate[indexes[j]]["mean"] !== undefined) ? results[i].aggregate[indexes[j]]["mean"] : undefined,
-                                    varp: (results[i].aggregate[indexes[j]]["m2"] !== undefined) ? results[i].aggregate[indexes[j]]["m2"] / results[i].aggregate[indexes[j]]["count"] : undefined,
-                                    vars: (results[i].aggregate[indexes[j]]["m2"] !== undefined) ? results[i].aggregate[indexes[j]]["m2"] / (results[i].aggregate[indexes[j]]["count"] - 1) : undefined,
-                                    stdp: (results[i].aggregate[indexes[j]]["m2"] !== undefined) ? Math.sqrt(results[i].aggregate[indexes[j]]["m2"] / results[i].aggregate[indexes[j]]["count"]) : undefined,
-                                    stds: (results[i].aggregate[indexes[j]]["m2"] !== undefined) ? Math.sqrt(results[i].aggregate[indexes[j]]["m2"] / (results[i].aggregate[indexes[j]]["count"] - 1)) : undefined,
-                                    m2: (results[i].aggregate[indexes[j]]["m2"] !== undefined) ? results[i].aggregate[indexes[j]]["m2"] : undefined
-                                };
                             }
                         }
                         if (results[i].start < start) start = results[i].start;
                         if (results[i].end > end) end = results[i].end;
                     }
-                    resolve({data: Object.keys(aggregate).map(index => {return {index: index, field: aggregate[index].field, min: aggregate[index].min, max: aggregate[index].max, count: aggregate[index].count, sum: aggregate[index].sum, mean: aggregate[index].mean, varp: (aggregate[index].count > 1) ? aggregate[index].varp : undefined, vars: (aggregate[index].count > 1) ? aggregate[index].vars : undefined, stdp: (aggregate[index].count > 1) ? aggregate[index].stdp : undefined, stds: (aggregate[index].count > 1) ? aggregate[index].stds : undefined}}), start: start, end: end, details: results})
+                    resolve({data: Object.keys(aggregates).map(index => { return {index: index, aggregates: Object.keys(aggregates[index]).map(field => {return {field: field, data: aggregates[index][field]}})}; }), start: start, end: end, details: results})
                 })
                 .catch(error => reject(error));
         });
 
     }
 
-    index(field) {
+    async index(field) {
         return new Promise ((resolve, reject) => {
             var promises = [];
 

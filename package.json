@@ -1,6 +1,6 @@
 {
   "name": "njodb",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
