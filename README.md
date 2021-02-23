@@ -241,7 +241,7 @@ Parameters:
 
 Name|Type|Description
 ----|----|-----------
-`selecter`|function|A function that returns a boolean that will be used to identify the records that should be returned
+`selecter`|function|A function that returns a boolean that will be used to identify the records that should be aggregated
 `indexer`|function| A function that returns an object that creates the index by which data will be grouped
 `projecter`|function| A function that returns an object that identifies the fields that should be returned
 
@@ -275,19 +275,19 @@ Name|Description
 `stdp`|The population standard deviation of the values of the field (undefined if not a number)
 `stds`|The sample standard deviation of the values of the field (undefined if not a number)
 
-An example (returns aggregates for all fields, grouped by state and lastName fields):
+An example (returns aggregates for all records and fields, grouped by state and lastName fields):
 ```js
 db.aggregate(
-    function (record) { return record.id < 1000; }, // selecter
+    function () { return true; }, // selecter (use all records)
     function (record) { return [record.state, record.lastName]; } // indexer (group records by state and lastName)
 );
 ```
 
-Another example (returns aggregates for only one two fields):
+Another example (returns aggregates for only two fields, grouped by state):
 ```js
 db.aggregate(
-    function (record) { return record.id < 1000; }, // selecter
-    function (record) { return [record.state]; }, // indexer
+    function (record) { return record.id < 1000; }, // selecter (only use records with an ID less than 1000)
+    function (record) { return [record.state]; }, // indexer (group by state)
     function (record) { return {favoriteNumber: record.favoriteNumber, firstName: record.firstName}; } // projecter (only return aggregate data for two fields)
 );
 ```
