@@ -25,48 +25,78 @@ const defaults = {
     "temppath": path.join(__dirname, "tmp")
 };
 
-const modified = Date.now();
+const firstNames = ["James", "John", "Robert", "Michael", "William", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth"];
+const lastNames = ["Smith", "Johsnon", "Williams", "Jones", "Brown", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
+const states = ["Maryland", "District of Columbia", "Virginia", "California", "Connecticut", "Illinois"];
 
-const data = [
-    {
-        id: 1,
-        name: "James",
-        nickname: "Good Times",
-        state: "Maryland",
-        favoriteNumber: 7,
-        modified: modified
-    },
-    {
-        id: 2,
-        name: "Steve",
-        nickname: "Esteban",
-        state: "Maryland",
-        favoriteNumber: 13,
-        modified: modified + 1
-    }
-];
+var inserts = [];
+var selects = [];
+var selectsProjection = [];
+var updates = [];
+var aggregates = [];
+var aggregatesProjection = [];
+var deletes = [];
 
-const selectProjection = [
-    {
-        nickname: "Good Times",
-        newFavoriteNumber: 7 * 5,
-    },
-    {
-        nickname: "Esteban",
-        newFavoriteNumber: 13 * 5,
-    }
-];
+var minFirstName = "William";
+var maxFirstName = "Elizabeth";
 
-const update = [
-    {
-        id: 1,
-        name: "James",
-        nickname: "Bulldog",
-        state: "Maryland",
-        favoriteNumber: 5,
-        modified: modified
+var minLastName = "Williams";
+var maxLastName = "Brown";
+
+var minState = "Virginia";
+var maxState = "California";
+
+for (var i = 0; i < 50; i++) {
+    const firstName = firstNames[Math.floor(Math.random()*firstNames.length)];
+    const lastName = lastNames[Math.floor(Math.random()*lastNames.length)];
+    const state = states[Math.floor(Math.random()*states.length)];
+
+    if (firstName < minFirstName) minFirstName = firstName;
+    if (firstName > maxFirstName) maxFirstName = firstName;
+
+    if (lastName < minLastName) minLastName = lastName;
+    if (lastName > maxLastName) maxLastName = lastName;
+
+    if (state < minState) minState = state;
+    if (state > maxState) maxState = state;
+
+    const data = {
+        id: i,
+        firstName: firstName,
+        lastName:lastName,
+        state: state,
+        favoriteNumber: i,
+    };
+
+    inserts.push(data);
+
+    if (firstName === "James" && lastName !== "Smith") {
+        selects.push(data);
+        selectsProjection.push(
+            {
+                id: i,
+                fullName: firstName + " " + lastName,
+                newFavoriteNumber: i * 5
+            }
+        );
     }
-];
+
+    if (lastName === "Smith") {
+        updates.push(
+            {
+                id: i,
+                firstName: firstName,
+                lastName:"Smythe",
+                state: state,
+                favoriteNumber: i,
+            }
+        );
+    }
+
+    if (i % 5 === 0) {
+        deletes.push(data);
+    }
+}
 
 const db = new njodb.Database(__dirname);
 
@@ -80,63 +110,137 @@ describe("NJODB tests", function() {
     });
 
     it("Insert", async () => {
-        const results = await db.insert(data);
-        expect(results.inserted).to.equal(2);
+        return db.insert(inserts).then(results => {
+            expect(results.inserted).to.equal(inserts.length);
+        });
     });
 
     it("Select", async () => {
-        const results = await db.select(function(record) { return record.id === 1 || record.name === "Steve"});
-        expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(data);
-        expect(results.selected).to.equal(2);
-        expect(results.ignored).to.equal(0);
+        return db.select(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; }).then(results => {
+            expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selects);
+            expect(results.selected).to.equal(selects.length);
+            expect(results.ignored).to.equal(inserts.length - selects.length);
+        });
     });
 
     it("Select with projection", async () => {
-        const results = await db.select(function(record) { return record.id === 1 || record.name === "Steve"}, function(record) { return {nickname: record.nickname, newFavoriteNumber: record.favoriteNumber * 5} });
-        expect(results.data.sort((a, b) => a.newFavoriteNumber - b.newFavoriteNumber)).to.deep.equal(selectProjection);
-        expect(results.selected).to.equal(2);
-        expect(results.ignored).to.equal(0);
+        return db.select(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; }, function(record) { return {id: record.id, fullName: record.firstName + " " + record.lastName, newFavoriteNumber: record.favoriteNumber * 5}; }).then(results => {
+            expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selectsProjection);
+            expect(results.selected).to.equal(selectsProjection.length);
+            expect(results.ignored).to.equal(inserts.length - selectsProjection.length);
+        });
     });
 
-    it("Update", function() {
-        db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog"; record.favoriteNumber = 7; return record; }).then(results => {
-            expect(results.updated).to.equal(1);
-            expect(results.unchanged).to.equal(1);
-            db.select(function(record) { return record.id === 1 }).then(results => {
-                expect(results.data).to.deep.equal(update);
-                expect(results.selected).to.equal(1);
-                expect(results.ignored).to.equal(0);
+    it("Update", async () => {
+        return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; }).then(results => {
+            expect(results.updated).to.equal(updates.length);
+            expect(results.unchanged).to.equal(inserts.length - updates.length);
+            db.select(function(record) { return record.lastName === "Smythe"; }).then(results => {
+                expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(updates);
+                expect(results.selected).to.equal(updates.length);
+                expect(results.ignored).to.equal(inserts.length - updates.length);
             });
         });
     });
 
-    it("Delete", function() {
-        db.delete(function(record) { return record.modified < Date.now()}).then(results => {
-            expect(results.deleted).to.equal(2);
-            expect(results.retained).to.equal(0);
-            db.select(function(record) { return true }).then(results => {
-                expect(results.data).to.deep.equal([]);
-                expect(results.selected).to.equal(0);
+    it("Aggregate", async () => {
+        return db.aggregate(function() { return true; }, function() { return true; }).then(results => {
+            expect(results.data[0].aggregates.length).to.equal(5);
+            for (var i = 0; i < results.data[0].aggregates.length; i++) {
+                switch(results.data[0].aggregates[i].field) {
+                    case "id":
+                        expect(results.data[0].aggregates[i].data.min).to.equal(0);
+                        expect(results.data[0].aggregates[i].data.max).to.equal(49);
+                        expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                        expect(results.data[0].aggregates[i].data.sum).to.equal(1225);
+                        expect(results.data[0].aggregates[i].data.mean).to.equal(24.5);
+                        expect(Math.abs(results.data[0].aggregates[i].data.varp - 208.25) < 0.00000000001).to.equal(true);
+                        expect(Math.abs(results.data[0].aggregates[i].data.vars - 212.5) < 0.00000000001).to.equal(true);
+                        expect(Math.abs(results.data[0].aggregates[i].data.stdp - Math.sqrt(208.25)) < 0.00000000001).to.equal(true);
+                        expect(Math.abs(results.data[0].aggregates[i].data.stds - Math.sqrt(212.5)) < 0.00000000001).to.equal(true);
+                        break;
+                    case "firstName":
+                        expect(results.data[0].aggregates[i].data.min).to.equal(minFirstName);
+                        expect(results.data[0].aggregates[i].data.max).to.equal(maxFirstName);
+                        expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                        expect(results.data[0].aggregates[i].data.sum).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.mean).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.varp).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.vars).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.stdp).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.stds).to.equal(undefined);
+                        break;
+                    case "lastName":
+                        expect(results.data[0].aggregates[i].data.min).to.equal(minLastName);
+                        expect(results.data[0].aggregates[i].data.max).to.equal(maxLastName);
+                        expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                        expect(results.data[0].aggregates[i].data.sum).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.mean).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.varp).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.vars).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.stdp).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.stds).to.equal(undefined);
+                        break;
+                    case "state":
+                        expect(results.data[0].aggregates[i].data.min).to.equal(minState);
+                        expect(results.data[0].aggregates[i].data.max).to.equal(maxState);
+                        expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                        expect(results.data[0].aggregates[i].data.sum).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.mean).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.varp).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.vars).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.stdp).to.equal(undefined);
+                        expect(results.data[0].aggregates[i].data.stds).to.equal(undefined);
+                        break;
+                    case "favoriteNumber":
+                        expect(results.data[0].aggregates[i].data.min).to.equal(0);
+                        expect(results.data[0].aggregates[i].data.max).to.equal(49);
+                        expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                        expect(results.data[0].aggregates[i].data.sum).to.equal(1225);
+                        expect(results.data[0].aggregates[i].data.mean).to.equal(24.5);
+                        expect(Math.abs(results.data[0].aggregates[i].data.varp - 208.25) < 0.00000000001).to.equal(true);
+                        expect(Math.abs(results.data[0].aggregates[i].data.vars - 212.5) < 0.00000000001).to.equal(true);
+                        expect(Math.abs(results.data[0].aggregates[i].data.stdp - Math.sqrt(208.25)) < 0.00000000001).to.equal(true);
+                        expect(Math.abs(results.data[0].aggregates[i].data.stds - Math.sqrt(212.5)) < 0.00000000001).to.equal(true);
+                        break;
+                }
+            }
+        });
+    });
+
+    it("Aggregate with projection", async () => {
+        return db.aggregate(function() { return true; }, function() { return true; }, function(record) { return {id2: record.id * 2}; }).then(results => {
+            expect(results.data[0].aggregates.length).to.equal(1);
+            expect(results.data[0].aggregates[0].data.min).to.equal(0);
+            expect(results.data[0].aggregates[0].data.max).to.equal(98);
+            expect(results.data[0].aggregates[0].data.count).to.equal(50);
+            expect(results.data[0].aggregates[0].data.sum).to.equal(2450);
+            expect(results.data[0].aggregates[0].data.mean).to.equal(49);
+            expect(Math.abs(results.data[0].aggregates[0].data.varp - 833) < 0.00000000001).to.equal(true);
+            expect(Math.abs(results.data[0].aggregates[0].data.vars - 850) < 0.00000000001).to.equal(true);
+            expect(Math.abs(results.data[0].aggregates[0].data.stdp - Math.sqrt(833)) < 0.00000000001).to.equal(true);
+            expect(Math.abs(results.data[0].aggregates[0].data.stds - Math.sqrt(850)) < 0.00000000001).to.equal(true);
+            db.getStats().then(results => console.log(results));
+        });
+    });
+
+    it("Delete", async () => {
+        return db.delete(function(record) { return record.id % 5 === 0; }).then(results => {
+            expect(results.deleted).to.equal(deletes.length);
+            expect(results.retained).to.equal(inserts.length - deletes.length);
+            db.select(function() { return true; }).then(results => {
+                expect(results.selected).to.equal(80);
                 expect(results.ignored).to.equal(0);
             });
         });
     })
 
-});
-
-describe("Trying to clean up", function() {
-
-    it("Deleting properties file", function() {
-        fs.unlinkSync(path.join(defaults.root, "njodb.properties"));
-    });
-
-    it("Deleting tmp files", function() {
-        fs.rmdirSync(path.join(defaults.root, "tmp"), {recursive: true});
-    });
-
-    it("Deleting data files", function() {
-        fs.rmdirSync(path.join(defaults.root, "data"), {recursive: true});
+    it("Drop", function() {
+        return db.drop().then((results) => {
+            expect(results.dropped).to.equal(true);
+        });
     });
 
 });
+
 

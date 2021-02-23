@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const njodb = require("./lib/njodb");
+const utils = require("./lib/utils");
 
 const defaults = {
     "datadir": "data",
@@ -41,7 +42,6 @@ class Database {
         }
 
         this.properties.root = root;
-
         this.properties.datapath = path.join(root, this.properties.datadir);
         this.properties.temppath = path.join(root, this.properties.tempdir);
 
@@ -78,11 +78,82 @@ class Database {
     }
 
     getStats() {
-        // return stats about datastores (names, filesize, number of records, etc.)
+        return new Promise((resolve, reject) => {
+            var promises = [];
+
+            for (var i = 0; i < this.properties.datastores; i++) {
+                const storename = [this.properties.dataname, i, "json"].join(".");
+                const storepath = path.join(this.properties.datapath, storename);
+
+                promises.push(
+                    njodb.statsStoreData(
+                        storepath,
+                        this.properties.lockoptions,
+                        this.properties.debug
+                    )
+                );
+            }
+
+            Promise.all(promises)
+                .then(results => {
+
+                    var stats = {
+                        size: 0,
+                        records: 0,
+                        min: undefined,
+                        max: undefined,
+                        mean: undefined,
+                        m2: 0
+                    };
+
+                    var start = Date.now();
+                    var end = 0;
+
+                    for (var i = 0; i < results.length; i++) {
+
+                        if (i === 0) {
+                            stats.min = results[i].records;
+                            stats.max = results[i].records;
+                            stats.mean = results[i].records;
+                        } else {
+                            if (results[i].records < stats.min) stats.min = results[i].records;
+                            if (results[i].records > stats.max) stats.max = results[i].records;
+                            const delta1 = results[i].records - stats.mean;
+                            stats.mean += delta1 / (i + 2);
+                            const delta2 = results[i].records - stats.mean;
+                            stats.m2 += delta1 * delta2;
+                        }
+
+                        if (results[i].size) stats.size += results[i].size;
+                        if (results[i].records) stats.records += results[i].records;
+                        if (results[i].start < start) start = results[i].start;
+                        if (results[i].end > end) end = results[i].end;
+
+                    }
+
+                    resolve(
+                        {
+                            size: utils.convertSize(stats.size),
+                            records: stats.records,
+                            min: stats.min,
+                            max: stats.max,
+                            mean: stats.mean,
+                            var: stats.m2/(results.length),
+                            std: Math.sqrt(stats.m2/(results.length)),
+                            start: start,
+                            end: end,
+                            details: results
+                        }
+                    );
+                })
+                .catch(error => {
+                    reject(error);
+                });
+        });
     }
 
     async insert(data) {
-        if (!Array.isArray(data) || (Array.isArray(data) && data.length === 0)) throw new Error ("Invalid data");
+        utils.checkValue("data", data, true, "array");
 
         return new Promise((resolve, reject) => {
             var promises = [];
@@ -97,46 +168,78 @@ class Database {
 
             for (var j = 0; j < records.length; j++) {
                 const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
-                const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + storenumber + ".json")
-                promises.push(njodb.insertStoreData(storepath, records[j], this.properties.lockoptions, this.properties.debug));
+                const storename = [this.properties.dataname, storenumber, "json"].join(".");
+                const storepath = path.join(this.properties.datapath, storename)
+
+                promises.push(
+                    njodb.insertStoreData(
+                        storepath,
+                        records[j],
+                        this.properties.lockoptions,
+                        this.properties.debug
+                    )
+                );
             }
 
             Promise.all(promises)
                 .then(results => {
+
                     var inserted = 0;
                     var start = Date.now();
                     var end = 0;
+
                     for (var i = 0; i < results.length; i++) {
                         inserted += results[i].inserted;
                         if (results[i].start < start) start = results[i].start;
                         if (results[i].end > end) end = results[i].end;
                     }
-                    resolve({inserted: inserted, start: start, end: end, details: results});
+
+                    resolve(
+                        {
+                            inserted: inserted,
+                            start: start,
+                            end: end,
+                            details: results
+                        }
+                    );
                 })
-                .catch(error => reject(error));
+                .catch(error => {
+                    reject(error);
+                });
         });
 
     }
 
     async select(selecter, projecter) {
-        if (!(selecter && typeof selecter === "function"))  throw new Error("selecter must be defined and must be a function");
-        if (projecter && typeof projecter !== "function")  throw new Error("projecter must be a function");
+        utils.checkValue("selecter", selecter, true, "function");
+        utils.checkValue("projecter", projecter, false, "function");
 
         return new Promise((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
                 const storepath = path.join(this.properties.datapath, this.properties.dataname + "." + i + ".json");
-                promises.push(njodb.selectStoreData(storepath, selecter, projecter, this.properties.lockoptions, this.properties.debug));
+
+                promises.push(
+                    njodb.selectStoreData(
+                        storepath,
+                        selecter,
+                        projecter,
+                        this.properties.lockoptions,
+                        this.properties.debug
+                    )
+                );
             }
 
             Promise.all(promises)
                 .then(results => {
+
                     var data = [];
                     var selected = 0;
                     var ignored = 0;
                     var start = Date.now();
                     var end = 0;
+
                     for (var i = 0; i < results.length; i++) {
                         data = data.concat(results[i].data);
                         selected += results[i].selected;
@@ -144,140 +247,314 @@ class Database {
                         if (results[i].start < start) start = results[i].start;
                         if (results[i].end > end) end = results[i].end;
                     }
-                    resolve({data: data, selected: selected, ignored: ignored, start: start, end: end, details: results})
+
+                    resolve(
+                        {
+                            data: data,
+                            selected: selected,
+                            ignored: ignored,
+                            start: start,
+                            end: end,
+                            details: results
+                        }
+                    );
                 })
-                .catch(error => {console.log(error); reject(error)});
+                .catch(error => {
+                    reject(error);
+                });
         });
     }
 
     async update(selecter, updater) {
-        if (!(selecter && typeof selecter === "function"))  throw new Error("selecter must be defined and must be a function");
-        if (!(updater && typeof updater === "function"))  throw new Error("updater must be defined and must be a function");
+        utils.checkValue("selecter", selecter, true, "function");
+        utils.checkValue("updater", updater, true, "function");
 
         return new Promise ((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
-                const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                const tempstorepath = path.join(this.properties.temppath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.updateStoreData(storepath, selecter, updater, tempstorepath, this.properties.lockoptions, this.properties.debug));
+                const storename = [this.properties.dataname, i, "json"].join(".");
+                const storepath = path.join(this.properties.datapath, storename);
+                const tempstorename = [this.properties.dataname, i, Date.now(), "json"].join(".");
+                const tempstorepath = path.join(this.properties.temppath, tempstorename);
+
+                promises.push(
+                    njodb.updateStoreData(
+                        storepath,
+                        selecter,
+                        updater,
+                        tempstorepath,
+                        this.properties.lockoptions,
+                        this.properties.debug
+                    )
+                );
             }
 
             Promise.all(promises)
                 .then(results => {
+
                     var updated = 0;
                     var unchanged = 0;
                     var start = Date.now();
                     var end = 0;
+
                     for (var i = 0; i < results.length; i++) {
                         updated += results[i].updated;
                         unchanged += results[i].unchanged;
                         if (results[i].start < start) start = results[i].start;
                         if (results[i].end > end) end = results[i].end;
                     }
-                    resolve({updated: updated, unchanged: unchanged, start: start, end: end, details: results})
+
+                    resolve(
+                        {
+                            updated: updated,
+                            unchanged: unchanged,
+                            start: start,
+                            end: end,
+                            details: results
+                        }
+                    );
                 })
-                .catch(error => reject(error));
+                .catch(error => {
+                    reject(error);
+                });
         });
     }
 
     async delete(selecter) {
-        if (!(selecter && typeof selecter === "function")) throw new Error("selecter must be defined and must be a function");
+        utils.checkValue("selecter", selecter, true, "function");
 
         return new Promise ((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
-                const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                const tempstorepath = path.join(this.properties.temppath, [this.properties.dataname, i, Date.now(), "json"].join("."));
-                promises.push(njodb.deleteStoreData(storepath, selecter, tempstorepath, this.properties.lockoptions, this.properties.debug));
+                const storename = [this.properties.dataname, i, "json"].join(".");
+                const storepath = path.join(this.properties.datapath, storename);
+                const tempstorename = [this.properties.dataname, i, Date.now(), "json"].join(".");
+                const tempstorepath = path.join(this.properties.temppath, tempstorename);
+
+                promises.push(
+                    njodb.deleteStoreData(
+                        storepath,
+                        selecter,
+                        tempstorepath,
+                        this.properties.lockoptions,
+                        this.properties.debug
+                    )
+                );
             }
 
             Promise.all(promises)
                 .then(results => {
+
                     var deleted = 0;
                     var retained = 0;
                     var start = Date.now();
                     var end = 0;
+
                     for (var i = 0; i < results.length; i++) {
                         deleted += results[i].deleted;
                         retained += results[i].retained;
                         if (results[i].start < start) start = results[i].start;
                         if (results[i].end > end) end = results[i].end;
                     }
-                    resolve({deleted: deleted, retained: retained, start: start, end: end, details: results})
+
+                    resolve(
+                        {
+                            deleted: deleted,
+                            retained: retained,
+                            start: start,
+                            end: end,
+                            details: results
+                        }
+                    );
                 })
-                .catch(error => reject(error));
+                .catch(error => {
+                    reject(error);
+                });
         });
     }
 
     async aggregate(selecter, indexer, projecter) {
-        if (!(selecter && typeof selecter === "function")) throw new Error("selecter must be defined and must be a function");
-        if (!(indexer && typeof indexer === "function")) throw new Error("indexer must be defined and must be a function");
-        if (!(projecter && typeof projecter === "function")) throw new Error("projecter must be defined and must be a function");
+        utils.checkValue("selecter", selecter, true, "function");
+        utils.checkValue("indexer", indexer, true, "function");
+        utils.checkValue("projecter", projecter, false, "function");
 
         return new Promise ((resolve, reject) => {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
-                const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                promises.push(njodb.aggregateStoreData(storepath, selecter, indexer, projecter, this.properties.lockoptions, this.properties.debug));
+                const storename = [this.properties.dataname, i, "json"].join(".");
+                const storepath = path.join(this.properties.datapath, storename);
+
+                promises.push(
+                    njodb.aggregateStoreData(
+                        storepath,
+                        selecter,
+                        indexer,
+                        projecter,
+                        this.properties.lockoptions,
+                        this.properties.debug
+                    )
+                );
             }
 
             Promise.all(promises)
                 .then(results => {
+
                     var aggregates = {};
                     var start = Date.now();
                     var end = 0;
+
                     for (var i = 0; i < results.length; i++) {
+
                         const indexes = Object.keys(results[i].aggregates);
+
                         for (var j = 0; j < indexes.length; j++) {
+
+                            if (!aggregates[indexes[j]]) aggregates[indexes[j]] = {};
+
                             const fields = Object.keys(results[i].aggregates[indexes[j]]);
+
                             for (var k = 0; k < fields.length; k++) {
-                                if (!aggregates[indexes[j]]) aggregates[indexes[j]] = {};
-                                if (aggregates[indexes[j]][fields[k]]) {
-                                    if (results[i].aggregates[indexes[j]][fields[k]]["min"] < aggregates[indexes[j]][fields[k]]["min"]) aggregates[indexes[j]][fields[k]]["min"] = results[i].aggregates[indexes[j]][fields[k]]["min"];
-                                    if (results[i].aggregates[indexes[j]][fields[k]]["max"] > aggregates[indexes[j]][fields[k]]["max"]) aggregates[indexes[j]][fields[k]]["max"] = results[i].aggregates[indexes[j]][fields[k]]["max"];
-                                    if (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) {
-                                        const n = aggregates[indexes[j]][fields[k]]["count"] + results[i].aggregates[indexes[j]][fields[k]]["count"];
-                                        const delta = results[i].aggregates[indexes[j]][fields[k]]["mean"] - aggregates[indexes[j]][fields[k]]["mean"];
-                                        const m2 = aggregates[indexes[j]][fields[k]]["m2"] + results[i].aggregates[indexes[j]][fields[k]]["m2"] + (Math.pow(delta, 2) * ((aggregates[indexes[j]][fields[k]]["count"] * results[i].aggregates[indexes[j]][fields[k]]["count"]) / n));
-                                        aggregates[indexes[j]][fields[k]]["m2"] = m2;
-                                        aggregates[indexes[j]][fields[k]]["varp"] = m2 / n;
-                                        aggregates[indexes[j]][fields[k]]["vars"] = m2 / (n - 1);
-                                        aggregates[indexes[j]][fields[k]]["stdp"] = Math.sqrt(m2 / n);
-                                        aggregates[indexes[j]][fields[k]]["stds"] = Math.sqrt(m2 / (n - 1));
+
+                                const aggregateObject = aggregates[indexes[j]][fields[k]];
+                                const resultObject = results[i].aggregates[indexes[j]][fields[k]];
+
+                                if (aggregateObject) {
+                                    if (resultObject["min"] < aggregateObject["min"]) aggregateObject["min"] = resultObject["min"];
+                                    if (resultObject["max"] > aggregateObject["max"]) aggregateObject["max"] = resultObject["max"];
+
+                                    if (resultObject["m2"] !== undefined) {
+                                        const n = aggregateObject["count"] + resultObject["count"];
+                                        const delta = resultObject["mean"] - aggregateObject["mean"];
+                                        const m2 = aggregateObject["m2"] + resultObject["m2"] + (Math.pow(delta, 2) * ((aggregateObject["count"] * resultObject["count"]) / n));
+                                        aggregateObject["m2"] = m2;
+                                        aggregateObject["varp"] = m2 / n;
+                                        aggregateObject["vars"] = m2 / (n - 1);
+                                        aggregateObject["stdp"] = Math.sqrt(m2 / n);
+                                        aggregateObject["stds"] = Math.sqrt(m2 / (n - 1));
                                     }
-                                    if (results[i].aggregates[indexes[j]][fields[k]]["sum"] !== undefined) {
-                                        aggregates[indexes[j]][fields[k]]["mean"] = (aggregates[indexes[j]][fields[k]]["sum"] + results[i].aggregates[indexes[j]][fields[k]]["sum"]) / (aggregates[indexes[j]][fields[k]]["count"] + results[i].aggregates[indexes[j]][fields[k]]["count"]);
-                                        aggregates[indexes[j]][fields[k]]["sum"] += results[i].aggregates[indexes[j]][fields[k]]["sum"];
+
+                                    if (resultObject["sum"] !== undefined) {
+                                        aggregateObject["mean"] = (aggregateObject["sum"] + resultObject["sum"]) / ( aggregateObject["count"] + resultObject["count"]);
+                                        aggregateObject["sum"] += resultObject["sum"];
                                     }
-                                    aggregates[indexes[j]][fields[k]]["count"] += results[i].aggregates[indexes[j]][fields[k]]["count"];
+
+                                    aggregateObject["count"] += resultObject["count"];
+
                                 } else {
+
                                     aggregates[indexes[j]][fields[k]] = {
-                                        field: results[i].aggregates[indexes[j]][fields[k]]["field"],
-                                        min: results[i].aggregates[indexes[j]][fields[k]]["min"],
-                                        max: results[i].aggregates[indexes[j]][fields[k]]["max"],
-                                        count: results[i].aggregates[indexes[j]][fields[k]]["count"],
-                                        sum:  (results[i].aggregates[indexes[j]][fields[k]]["sum"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["sum"] : undefined,
-                                        mean:  (results[i].aggregates[indexes[j]][fields[k]]["mean"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["mean"] : undefined,
-                                        varp: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["m2"] / results[i].aggregates[indexes[j]][fields[k]]["count"] : undefined,
-                                        vars: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["m2"] / (results[i].aggregates[indexes[j]][fields[k]]["count"] - 1) : undefined,
-                                        stdp: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? Math.sqrt(results[i].aggregates[indexes[j]][fields[k]]["m2"] / results[i].aggregates[indexes[j]][fields[k]]["count"]) : undefined,
-                                        stds: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? Math.sqrt(results[i].aggregates[indexes[j]][fields[k]]["m2"] / (results[i].aggregates[indexes[j]][fields[k]]["count"] - 1)) : undefined,
-                                        m2: (results[i].aggregates[indexes[j]][fields[k]]["m2"] !== undefined) ? results[i].aggregates[indexes[j]][fields[k]]["m2"] : undefined
+                                        min: resultObject["min"],
+                                        max: resultObject["max"],
+                                        count: resultObject["count"],
+                                        sum: resultObject["sum"],
+                                        mean: resultObject["mean"],
+                                        varp: undefined,
+                                        vars: undefined,
+                                        stdp: undefined,
+                                        stds: undefined,
+                                        m2: undefined
                                     };
+
+                                    if (resultObject["m2"] !== undefined) {
+                                        aggregates[indexes[j]][fields[k]]["varp"] = resultObject["m2"] / resultObject["count"];
+                                        aggregates[indexes[j]][fields[k]]["vars"] = resultObject["m2"] / (resultObject["count"] - 1);
+                                        aggregates[indexes[j]][fields[k]]["stdp"] = Math.sqrt(resultObject["m2"] / resultObject["count"]);
+                                        aggregates[indexes[j]][fields[k]]["stds"] = Math.sqrt(resultObject["m2"] / (resultObject["count"] - 1));
+                                        aggregates[indexes[j]][fields[k]]["m2"] = resultObject["m2"];
+                                    }
+
                                 }
                             }
                         }
+
                         if (results[i].start < start) start = results[i].start;
                         if (results[i].end > end) end = results[i].end;
+
                     }
-                    resolve({data: Object.keys(aggregates).map(index => { return {index: index, aggregates: Object.keys(aggregates[index]).map(field => {return {field: field, data: aggregates[index][field]}})}; }), start: start, end: end, details: results})
+
+                    resolve(
+                        {
+                            data: Object.keys(aggregates).map(index => {
+                                return {
+                                    index: index,
+                                    aggregates: Object.keys(aggregates[index]).map(field => {
+                                        delete aggregates[index][field].m2;
+                                        return {
+                                            field: field,
+                                            data: aggregates[index][field]
+                                        };
+                                    })
+                                };
+                            }),
+                            start: start,
+                            end: end,
+                            details: results
+                        }
+                    );
                 })
-                .catch(error => reject(error));
+                .catch(error => {
+                    reject(error);
+                });
         });
 
+    }
+
+    async drop() {
+        return new Promise((resolve, reject) => {
+            var promises = [];
+
+            for (var i = 0; i < this.properties.datastores; i++) {
+                const storename = [this.properties.dataname, i, "json"].join(".");
+                const storepath = path.join(this.properties.datapath, storename);
+
+                promises.push(
+                    Promise.resolve(
+                        njodb.deleteFile(
+                            storepath,
+                            this.properties.lockoptions,
+                            this.properties.debug
+                        )
+                    )
+                );
+            }
+
+            Promise.all(promises)
+            .then(() => {
+                promises.push([
+                    njodb.deleteDirectory(this.properties.temppath),
+                    njodb.deleteDirectory(this.properties.datapath),
+                    njodb.deleteFile(path.join(this.properties.root, "njodb.properties"))
+                ]);
+
+                Promise.all(promises)
+                    .then(results => {
+                        var start = Date.now();
+                        var end = 0;
+
+                        for (var i = 0; i < results.length; i++) {
+                            if (results[i].start < start) start = results[i].start;
+                            if (results[i].end > end) end = results[i].end;
+                        }
+
+                        resolve(
+                            {
+                                dropped: true,
+                                start: start,
+                                end: end
+                            }
+                        );
+                    })
+                    .catch(error => {
+                        reject(error);
+                    });
+                })
+            .catch(error => {
+                reject(error);
+            });
+        });
     }
 
     async index(field) {
@@ -285,19 +562,29 @@ class Database {
             var promises = [];
 
             for (var i = 0; i < this.properties.datastores; i++) {
-                const storepath = path.join(this.properties.datapath, [this.properties.dataname, i, "json"].join("."));
-                promises.push(njodb.indexStoreData(storepath, field, this.properties.lockoptions, this.properties.debug));
+                const storename = [this.properties.dataname, i, "json"].join(".");
+                const storepath = path.join(this.properties.datapath, storename);
+
+                promises.push(
+                    njodb.indexStoreData(
+                        storepath,
+                        field,
+                        this.properties.lockoptions,
+                        this.properties.debug
+                    )
+                );
             }
 
             Promise.all(promises)
                 .then(results => {
+
                     var index = {};
                     var start = Date.now();
                     var end = 0;
+
                     for (var i = 0; i < results.length; i++) {
-                        if (results[i].start < start) start = results[i].start;
-                        if (results[i].end > end) end = results[i].end;
                         const keys = Object.keys(results[i].index).sort((a, b) => {if (a < b) return -1; if (a > b) return 1; return 0; });
+
                         for (var j = 0; j < keys.length; j++) {
                             if (index[keys[j]]) {
                                 index[keys[j]].push({store: results[i].store, lines: results[i].index[keys[j]]});
@@ -305,14 +592,30 @@ class Database {
                                 index[keys[j]] = [{store: results[i].store, lines: results[i].index[keys[j]]}];
                             }
                         }
+
+                        if (results[i].start < start) start = results[i].start;
+                        if (results[i].end > end) end = results[i].end;
                     }
+
                     const indexpath = path.join(this.properties.datapath, ["index", field, "json"].join("."));
+
                     fs.writeFile(indexpath, JSON.stringify(index), (error) => {
                         if (error) throw error;
-                        resolve({field: field, path: indexpath, size: Object.keys(index).length, start: start, end: end, details: results});
+                        resolve(
+                            {
+                                field: field,
+                                path: indexpath,
+                                size: Object.keys(index).length,
+                                start: start,
+                                end: end,
+                                details: results
+                            }
+                        );
                     });
                 })
-                .catch(error => reject(error));
+                .catch(error => {
+                    reject(error);
+                });
         });
     }
 }

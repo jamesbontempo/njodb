@@ -11,11 +11,14 @@
 - [Basic methods](#basic-methods)
   - [getProperties](#getproperties)
   - [setProperties](#setproperties)
+  - [getStats](#getStats)
   - [getDebug](#getdebug)
   - [setDebug](#setdebug)
+  - [drop](#drop)
 - [Data manipulation methods](#data-manipulation-methods)
   - [insert](#insert)
   - [select](#select)
+  - [aggregate](#aggregate)
   - [update](#update)
   - [delete](#delete)
 
@@ -28,8 +31,6 @@ npm install njodb
 ```js
 npm test
 ```
-
-The test will try to clean up after itself by removing any files or directories it creates, but sometimes this fails. If it does fail, it's often with the error "ENOENT: no such file or directory." This is likely due to a race condition that arises somewhere within the call to `fs.rmdirSync`. A failure within this part of the test does not mean that there is a problem with the module, only that the test wasn't able to clean up after itself.
 
 ## Introduction
 Load the module:
@@ -62,22 +63,27 @@ const data = [
 
 Insert them into the database:
 ```js
-db.insert(data);
+db.insert(data).then( /* do something */ );
 ```
 
 Select some records from the database by supplying a function to find matches:
 ```js
-db.select(function(record) { return record.id === 1 || record.name === "Steve"});
+db.select(function(record) { return record.id === 1 || record.name === "Steve"}).then( /* do something */ );
 ```
 
 Update some records in the database by supplying a function to find matches and another function to update them:
 ```js
-db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog"; return record; });
+db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog"; return record; }).then( /* do something */ );
 ```
 
 Delete some records from the database by supplying a function to find matches:
 ```js
-db.delete(function(record) { return record.modified < Date.now()});
+db.delete(function(record) { return record.modified < Date.now()}).then( /* do something */ );
+```
+
+Delete the database:
+```js
+db.drop().then( /* do something */ );
 ```
 
 ## Constructor
@@ -96,7 +102,7 @@ Example:
 ```js
 const db = new njodb.Database() // created in the current directory
 
-const db = new njodb.Databas("/path/to/some/other/place")
+const db = new njodb.Databas("/path/to/some/other/place") // created elsewhere
 ```
 
 ### Database properties
@@ -130,6 +136,25 @@ Name|Type|Description|Default
 ----|----|-----------|-------
 `properties`|object|The properties to set for the `Database`|See [Database properties](#database-properties)
 
+### getStats
+
+An asynchronous method that returns statistics about the `Database`.
+
+Returns a promises that resolves with the following information:
+
+Name|Description
+----|-----------
+`size`|The total size of the `Database` (the sum of the sizes of the individual partitions)
+`records`|The total number of records in the `Database` (the sum of the number of records in each partition)
+`min`|The minimum number of records in a partition
+`max`|The maximum number of records in a partition
+`mean`|The mean (i.e., average) number of records in each parition
+`var`|The variance of the number of records across partitions
+`std`|The standard deviation of the number of records across partitions
+`start`|The timestamp of when the `getStats` call started
+`end`|The timestamp of when the `getStats` call finished
+`details`|An array of detailed stats for each partition
+
 ### getDebug
 
 Returns the `debug` property for the `Database`.
@@ -144,11 +169,17 @@ Name|Type|Description|Default
 ----|----|-----------|-------
 `debug`|boolean|The `debug` property to set for the `Database`|`false`
 
+### drop
+
+An asynchronous method that deletes the database, including all data and temp files, their sub-directories, and the properties file.
+
 ## Data manipulation methods
 
 All data manipulation methods are asynchronous and return a `Promise`.
 
 ### insert
+
+`insert(data)`
 
 Inserts data into the `Database`.
 
@@ -169,6 +200,8 @@ Name|Type|Description
 
 ### select
 
+`select(selecter [, projector])`
+
 Selects data from the `Database`.
 
 Parameters:
@@ -176,6 +209,7 @@ Parameters:
 Name|Type|Description
 ----|----|-----------
 `selecter`|function|A function that returns a boolean that will be used to identify the records that should be returned
+`projecter`|function| A function that returns an object that identifies the fields that should be returned
 
 Resolves with an object containing results from the `select`:
 
@@ -184,11 +218,156 @@ Name|Type|Description
 `data`|array|An array of objects selected from the `Database`
 `selected`|number|The number of objects selected from the `Database`
 `ignored`|number|The number of objects that were not selected from the `Database`
-`start`|date|The timestamp of when the insertions began
-`end`|date|The timestamp of when the insertions finished
+`start`|date|The timestamp of when the selections began
+`end`|date|The timestamp of when the selections finished
 `details`|array|An array of selection results for each individual `datastore`
 
+Example with projection (returns only the `id` and `modified` fields but also creates a new one called `newID`):
+
+```js
+db.select(
+    function () { return true; }, // selecter (return all records)
+    function (record) { return {id: record.id, newID: record.id + 1, modified: record.modified }} // projecter (return a subset of fields and create a new one)
+);
+```
+
+### aggregate
+
+`aggregate(selecter, indexer [, projecter])`
+
+Aggregates data in the database.
+
+Parameters:
+
+Name|Type|Description
+----|----|-----------
+`selecter`|function|A function that returns a boolean that will be used to identify the records that should be returned
+`indexer`|function| A function that returns an object that creates the index by which data will be grouped
+`projecter`|function| A function that returns an object that identifies the fields that should be returned
+
+Resolves with an object containing results from the `aggregate`:
+
+Name|Type|Description
+----|----|-----------
+`data`|array|An array of index objects selected from the `Database`
+`start`|date|The timestamp of when the aggregations began
+`end`|date|The timestamp of when the aggregations finished
+`details`|array|An array of selection results for each individual `datastore`
+
+Each index object contains the following:
+
+Name|Type|Description
+----|----|-----------
+`index`|any valid type|The value of the index created by the indexer function
+`data`|array|An array of aggregation objects for each field of the records returned
+
+Each aggregation object contains the following:
+
+Name|Description
+----|-----------
+`min`|Minimum value of the field
+`max`|Maximum value of the field
+`count`|The count of records that matched the index
+`sum`|The sum of the values of the field (undefined if not a number)
+`mean`| The mean (i.e., average) of the values of the field (undefined if not a number)
+`varp`|The population variance of the values of the field (undefined if not a number)
+`vars`|The sample variance of the values of the field (undefined if not a number)
+`stdp`|The population standard deviation of the values of the field (undefined if not a number)
+`stds`|The sample standard deviation of the values of the field (undefined if not a number)
+
+An example (returns aggregates for all fields, grouped by state and lastName fields):
+```js
+db.aggregate(
+    function (record) { return record.id < 1000; }, // selecter
+    function (record) { return [record.state, record.lastName]; } // indexer (group records by state and lastName)
+);
+```
+
+Another example (returns aggregates for only one two fields):
+```js
+db.aggregate(
+    function (record) { return record.id < 1000; }, // selecter
+    function (record) { return [record.state]; }, // indexer
+    function (record) { return {favoriteNumber: record.favoriteNumber, firstName: record.firstName}; } // projecter (only return aggregate data for two fields)
+);
+```
+
+Example aggregate data array:
+```js
+[
+    {
+        index: "Maryland",
+        aggregates: [
+            {
+                field: "favoriteNumber",
+                data: {
+                      min: 0,
+                      max: 98,
+                      count: 50,
+                      sum: 2450,
+                      mean: 49,
+                      varp: 833,
+                      vars: 850,
+                      stdp: 28.861739379323623,
+                      stds: 29.154759474226502
+                  }
+            },
+            {
+                field: "firstName",
+                data: {
+                    min: "Elizabeth",
+                    max: "William",
+                    count: 50,
+                    sum: undefined,
+                    mean: undefined,
+                    varp: undefined,
+                    vars: undefined,
+                    stdp: undefined,
+                    stds: undefined
+                }
+            }
+        ]
+    },
+    {
+        index: "Virginia",
+        aggregates: [
+            {
+                field: "favoriteNumber",
+                data: {
+                    min: 0,
+                    max: 49,
+                    count: 50,
+                    sum: 1225,
+                    mean: 24.5,
+                    varp: 208.25000000000003,
+                    vars: 212.50000000000003,
+                    stdp: 14.430869689661813,
+                    stds: 14.577379737113253
+                }
+            },
+            {
+                field: "firstName",
+                data: {
+                    min: "James",
+                    max: "Robert",
+                    count: 50,
+                    sum: undefined,
+                    mean: undefined,
+                    varp: undefined,
+                    vars: undefined,
+                    stdp: undefined,
+                    stds: undefined
+                }
+            }
+        ]
+    }
+]
+```
+
+
 ### update
+
+`update(selecter, updater)`
 
 Updates data in the `Database`.
 
@@ -205,11 +384,13 @@ Name|Type|Description
 ----|----|-----------
 `updated`|number|The number of objects updated in the `Database`
 `unchanged`|number|The number of objects that were not updated in the `Database`
-`start`|date|The timestamp of when the insertions began
-`end`|date|The timestamp of when the insertions finished
+`start`|date|The timestamp of when the updates began
+`end`|date|The timestamp of when the updates finished
 `details`|array|An array of update results for each individual `datastore`
 
 ### delete
+
+`delete(selecter)`
 
 Deletes data from the `Database`.
 
@@ -225,8 +406,8 @@ Name|Type|Description
 ----|----|-----------
 `deleted`|number|The number of objects deleted from the `Database`
 `retained`|number|The number of objects that were not deleted from the `Database`
-`start`|date|The timestamp of when the insertions began
-`end`|date|The timestamp of when the insertions finished
+`start`|date|The timestamp of when the deletions began
+`end`|date|The timestamp of when the deletions finished
 `details`|array|An array of deletion results for each individual `datastore`
 
 
