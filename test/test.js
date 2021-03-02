@@ -8,7 +8,6 @@ const defaults = {
     "dataname": "data",
     "datapath": path.join(__dirname, "data"),
     "datastores": 5,
-    "debug": false,
     "lockoptions": {
         "stale": 5000,
         "update": 1000,
@@ -33,8 +32,6 @@ var inserts = [];
 var selects = [];
 var selectsProjection = [];
 var updates = [];
-var aggregates = [];
-var aggregatesProjection = [];
 var deletes = [];
 
 var minFirstName = "William";
@@ -98,11 +95,12 @@ for (var i = 0; i < 50; i++) {
     }
 }
 
-const db = new njodb.Database(__dirname);
+var db;
 
 describe("NJODB tests", function() {
 
     it("Constructor", function() {
+        db = new njodb.Database(__dirname);
         expect(db.getProperties()).to.deep.equal(defaults);
         expect(fs.existsSync(path.join(defaults.root, "njodb.properties"))).to.equal(true);
         expect(fs.existsSync(path.join(defaults.root, "data"))).to.equal(true);
@@ -220,7 +218,6 @@ describe("NJODB tests", function() {
             expect(Math.abs(results.data[0].aggregates[0].data.vars - 850) < 0.00000000001).to.equal(true);
             expect(Math.abs(results.data[0].aggregates[0].data.stdp - Math.sqrt(833)) < 0.00000000001).to.equal(true);
             expect(Math.abs(results.data[0].aggregates[0].data.stds - Math.sqrt(850)) < 0.00000000001).to.equal(true);
-            db.getStats().then(results => console.log(results));
         });
     });
 
@@ -228,12 +225,36 @@ describe("NJODB tests", function() {
         return db.delete(function(record) { return record.id % 5 === 0; }).then(results => {
             expect(results.deleted).to.equal(deletes.length);
             expect(results.retained).to.equal(inserts.length - deletes.length);
-            db.select(function() { return true; }).then(results => {
-                expect(results.selected).to.equal(80);
-                expect(results.ignored).to.equal(0);
-            });
         });
     })
+
+    it("Grow", async () => {
+        return db.grow().then(results => {
+            expect(results.stores).to.equal(defaults.datastores + 1);
+            expect(results.records).to.equal(inserts.length - deletes.length);
+        })
+    });
+
+    it("Resize", async () => {
+        return db.resize(3).then(results => {
+            expect(results.stores).to.equal(3);
+            expect(results.records).to.equal(inserts.length - deletes.length);
+        })
+    });
+
+    it("Shrink", async () => {
+        return db.shrink().then(results => {
+            expect(results.stores).to.equal(2);
+            expect(results.records).to.equal(inserts.length - deletes.length);
+        })
+    });
+
+    it("Stats", async () => {
+        return db.getStats().then(results => {
+            expect(results.stores).to.equal(2);
+            expect(results.records).to.equal(inserts.length - deletes.length);
+        })
+    });
 
     it("Drop", function() {
         return db.drop().then((results) => {

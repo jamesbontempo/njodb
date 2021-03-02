@@ -8,13 +8,14 @@
 - [Introduction](#introduction)
 - [Constructor](#constructor)
   - [Database properties](#database-properties)
-- [Basic methods](#basic-methods)
+- [Database management methods](#database-management-methods)
+  - [grow](#grow)
+  - [shrink](#shrink)
+  - [resize](#resize)
+  - [drop](#drop)
+  - [getStats](#getStats)
   - [getProperties](#getproperties)
   - [setProperties](#setproperties)
-  - [getStats](#getStats)
-  - [getDebug](#getdebug)
-  - [setDebug](#setdebug)
-  - [drop](#drop)
 - [Data manipulation methods](#data-manipulation-methods)
   - [insert](#insert)
   - [select](#select)
@@ -95,14 +96,14 @@ Name|Type|Description|Default
 ----|----|-----------|-------
 `root`|string|path to the root directory of the `Database`|`process.cwd()`
 
-If the `root` directory does not exist it will be created, along with a default `njodb.properties` file and default data and temp directories (See [Database properties](#database-properties) below).
+If an `njodb.properties` file already exists in the `root` directory, a connection to the existing `Database` will be created. If the `root` directory does not exist it will be created, along with a default `njodb.properties` file (see [Database properties](#database-properties) below). If the data and temp directories do not exist, they will be created.
 
 Example:
 
 ```js
-const db = new njodb.Database() // created in the current directory
+const db = new njodb.Database() // created in or connected to the current directory
 
-const db = new njodb.Databas("/path/to/some/other/place") // created elsewhere
+const db = new njodb.Database("/path/to/some/other/place") // created or connected to elsewhere
 ```
 
 ### Database properties
@@ -114,19 +115,75 @@ Name|Type|Description|Default
 ----|----|-----------|-------
 `datadir`|string|The name of the subdirectory of `root` where data files will be stored|`data`
 `dataname`|string|The file name that will be used when creating or accessing data files|`data`
-`datastores`|number|The number of data stores, or data partitions, that will be used|`5`
+`datastores`|number|The number of data partitions that will be used|`5`
 `tempdir`|string|The name of the subdirectory of `root` where temporary data files will be stored|`tmp`
 `lockoptions`|object|The options that will be used by [proper-lockfile](https://www.npmjs.com/package/proper-lockfile) to lock data files|`{"stale": 5000, "update": 1000, "retries": { "retries": 5000, "minTimeout": 250, "maxTimeout": 5000, "factor": 0.15, "randomize": false } }`
 `debug`|boolean|Whether to print out debugging information to the console|`false`
 
 
-## Basic methods
+## Database management methods
+
+### grow
+
+`grow()`
+
+An asynchronous method that increases the number of `datastores` by one and redistributes the data across them.
+
+### shrink
+
+`shrink()`
+
+An asynchronous method that decreases the number of `datastores` by one and redistributes the data across them. If the current number of `datastores` is one, calling `shrink()` will throw an error.
+
+### resize
+
+`resize(size)`
+
+An asynchronous method that changes the number of `datastores` and redistributes the data across them.
+
+Parameters:
+
+Name|Type|Description
+----|----|-----------
+`size`|number|The number of `datastores` (must be greater than zero)
+
+### drop
+
+`drop()`
+
+An asynchronous method that deletes the database, including the data and temp directories, and the properties file.
+
+### getStats
+
+`getStats()`
+
+An asynchronous method that returns statistics about the `Database`.
+
+Returns a promises that resolves with the following information:
+
+Name|Description
+----|-----------
+`size`|The total size of the `Database` (the sum of the sizes of the individual `datastores`)
+`stores`|The total number of `datastores` in the `Database`
+`records`|The total number of records in the `Database` (the sum of the number of records in each `datastore`)
+`min`|The minimum number of records in a `datastore`
+`max`|The maximum number of records in a `datastore`
+`mean`|The mean (i.e., average) number of records in each `datastore`
+`var`|The variance of the number of records across `datastores`
+`std`|The standard deviation of the number of records across `datastores`
+`start`|The timestamp of when the `getStats` call started
+`end`|The timestamp of when the `getStats` call finished
+`details`|An array of detailed stats for each `datastore`
 
 ### getProperties
+
+`getProperties()`
 
 Returns the properties set for the `Database`.
 
 ### setProperties
+
+`setProperties(properties)`
 
 Sets the properties for the the `Database`.
 
@@ -136,42 +193,6 @@ Name|Type|Description|Default
 ----|----|-----------|-------
 `properties`|object|The properties to set for the `Database`|See [Database properties](#database-properties)
 
-### getStats
-
-An asynchronous method that returns statistics about the `Database`.
-
-Returns a promises that resolves with the following information:
-
-Name|Description
-----|-----------
-`size`|The total size of the `Database` (the sum of the sizes of the individual partitions)
-`records`|The total number of records in the `Database` (the sum of the number of records in each partition)
-`min`|The minimum number of records in a partition
-`max`|The maximum number of records in a partition
-`mean`|The mean (i.e., average) number of records in each parition
-`var`|The variance of the number of records across partitions
-`std`|The standard deviation of the number of records across partitions
-`start`|The timestamp of when the `getStats` call started
-`end`|The timestamp of when the `getStats` call finished
-`details`|An array of detailed stats for each partition
-
-### getDebug
-
-Returns the `debug` property for the `Database`.
-
-### setDebug
-
-Sets the `debug` property for the `Database`.
-
-Parameters:
-
-Name|Type|Description|Default
-----|----|-----------|-------
-`debug`|boolean|The `debug` property to set for the `Database`|`false`
-
-### drop
-
-An asynchronous method that deletes the database, including all data and temp files, their sub-directories, and the properties file.
 
 ## Data manipulation methods
 
