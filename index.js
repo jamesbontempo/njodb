@@ -100,7 +100,7 @@ class Database {
     }
 
     async shrink() {
-        if (this.properties.datastores > 2) {
+        if (this.properties.datastores > 1) {
             this.properties.datastores--;
             saveProperties(this.properties.root, this.properties);
 
