@@ -32,7 +32,7 @@ const saveProperties = (root, properties) => {
     };
     const propertiesFile = path.join(root, "njodb.properties");
     fs.writeFileSync(propertiesFile, JSON.stringify(properties, null, 4));
-    return true;
+    return properties;
 }
 
 class Database {
@@ -80,7 +80,7 @@ class Database {
         return this.properties;
     }
 
-    async getStats() {
+    async stats() {
         var promises = [];
         const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
 
@@ -97,6 +97,61 @@ class Database {
 
         const results = await Promise.all(promises);
         return reduce.getStatsReduce(results);
+    }
+
+    statsSync() {
+        var results = [];
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
+        for (const storename of storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+            results.push(njodb.statsStoreDataSync(storepath));
+        }
+
+        return reduce.getStatsReduce(results);
+    }
+
+    async getStats() {
+        return this.stats();
+    }
+
+    getStatsSync() {
+        return this.statsSync();
+    }
+
+    async grow() {
+        this.properties.datastores++;
+        saveProperties(this.properties.root, this.properties);
+
+        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+
+        const results = await njodb.distributeStoreData(
+            this.properties.datapath,
+            this.properties.dataname,
+            storenames,
+            this.properties.temppath,
+            this.properties.datastores,
+            this.properties.lockoptions
+        );
+
+        return results;
+    }
+
+    growSync() {
+        this.properties.datastores++;
+        saveProperties(this.properties.root, this.properties);
+
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
+        const results = njodb.distributeStoreDataSync(
+            this.properties.datapath,
+            this.properties.dataname,
+            storenames,
+            this.properties.temppath,
+            this.properties.datastores
+        );
+
+        return results;
     }
 
     async shrink() {
@@ -121,22 +176,25 @@ class Database {
         }
     }
 
-    async grow() {
-        this.properties.datastores++;
-        saveProperties(this.properties.root, this.properties);
+    shrinkSync() {
+        if (this.properties.datastores > 1) {
+            this.properties.datastores--;
+            saveProperties(this.properties.root, this.properties);
 
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+            const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
-        const results = await njodb.distributeStoreData(
-            this.properties.datapath,
-            this.properties.dataname,
-            storenames,
-            this.properties.temppath,
-            this.properties.datastores,
-            this.properties.lockoptions
-        );
+            const results = njodb.distributeStoreDataSync(
+                this.properties.datapath,
+                this.properties.dataname,
+                storenames,
+                this.properties.temppath,
+                this.properties.datastores
+            );
 
-        return results;
+            return results;
+        } else {
+            throw new Error("database cannot shrink any further");
+        }
     }
 
     async resize(size) {
@@ -159,24 +217,41 @@ class Database {
         return results;
     }
 
+    resizeSync(size) {
+        utils.checkValue("size", size, false, "number", function(size) { return size > 0; });
+
+        this.properties.datastores = size;
+        saveProperties(this.properties.root, this.properties);
+
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
+        const results = njodb.distributeStoreDataSync(
+            this.properties.datapath,
+            this.properties.dataname,
+            storenames,
+            this.properties.temppath,
+            size
+        );
+
+        return results;
+    }
+
     async drop() {
         var promises = [];
+        var results = [];
+
         const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
 
         for (const storename of storenames) {
             const storepath = path.join(this.properties.datapath, storename);
 
             promises.push(
-                Promise.resolve(
-                    utils.deleteFile(
-                        storepath,
-                        this.properties.lockoptions
-                    )
+                utils.deleteFile(
+                    storepath,
+                    this.properties.lockoptions
                 )
             );
         }
-
-        await Promise.all(promises);
 
         promises.push(
             [
@@ -186,7 +261,35 @@ class Database {
             ]
         );
 
-        const results = await Promise.all(promises);
+        results = await Promise.all(promises);
+
+        return reduce.dropReduce(results);
+    }
+
+    dropSync() {
+        var results = [];
+
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
+        for (const storename of storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+
+            results.push(
+                utils.deleteFileSync(
+                    storepath,
+                    true
+                )
+            )
+        }
+
+        results.push(
+            [
+                utils.deleteDirectorySync(this.properties.temppath, true),
+                utils.deleteDirectorySync(this.properties.datapath, true),
+                utils.deleteFileSync(path.join(this.properties.root, "njodb.properties"))
+            ]
+        );
+
         return reduce.dropReduce(results);
     }
 
@@ -196,6 +299,37 @@ class Database {
         utils.checkValue("data", data, true, "array", function(data) { return data.length > 0; });
 
         var promises = [];
+        var records = [];
+
+        for (var i = 0; i < data.length; i++) {
+            if (i === i % this.properties.datastores) records[i] = [];
+            records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
+        }
+
+        var stores = Array.from(Array(this.properties.datastores).keys());
+
+        for (var j = 0; j < records.length; j++) {
+            const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
+            const storename = [this.properties.dataname, storenumber, "json"].join(".");
+            const storepath = path.join(this.properties.datapath, storename)
+
+            promises.push(
+                njodb.insertStoreData(
+                    storepath,
+                    records[j],
+                    this.properties.lockoptions
+                )
+            );
+        }
+
+        const results = await Promise.all(promises);
+        return reduce.insertReduce(results);
+    }
+
+    insertSync(data) {
+        utils.checkValue("data", data, true, "array", function(data) { return data.length > 0; });
+
+        var results = [];
         var records = [];
 
         for (var i = 0; i < data.length; i++) {
@@ -219,8 +353,8 @@ class Database {
             const storename = [this.properties.dataname, storenumber, "json"].join(".");
             const storepath = path.join(this.properties.datapath, storename)
 
-            promises.push(
-                njodb.insertStoreData(
+            results.push(
+                njodb.insertStoreDataSync(
                     storepath,
                     records[j],
                     this.properties.lockoptions
@@ -228,7 +362,6 @@ class Database {
             );
         }
 
-        const results = await Promise.all(promises);
         return reduce.insertReduce(results);
     }
 
@@ -253,6 +386,83 @@ class Database {
 
         const results = await Promise.all(promises);
         return reduce.selectReduce(results);
+    }
+
+    selectSync(selecter, projecter) {
+        utils.checkValue("selecter", selecter, true, "function");
+        utils.checkValue("projecter", projecter, false, "function");
+
+        var results = [];
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
+        for (const storename of storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+            results.push(
+                njodb.selectStoreDataSync(
+                    storepath,
+                    selecter,
+                    projecter
+                )
+            );
+        }
+
+        return reduce.selectReduce(results);
+    }
+
+    async aggregate(selecter, indexer, projecter) {
+        utils.checkValue("selecter", selecter, true, "function");
+        utils.checkValue("indexer", indexer, true, "function");
+        utils.checkValue("projecter", projecter, false, "function");
+
+        var promises = [];
+        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+
+        for (const storename of storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+
+            promises.push(
+                njodb.aggregateStoreData(
+                    storepath,
+                    selecter,
+                    indexer,
+                    projecter,
+                    this.properties.lockoptions
+                )
+            );
+        }
+
+        const results = await Promise.all(promises);
+        return reduce.aggregateReduce(results);
+    }
+
+    aggregateSync(selecter, indexer, projecter) {
+        utils.checkValue("selecter", selecter, true, "function");
+        utils.checkValue("indexer", indexer, true, "function");
+
+        utils.checkValue(
+            "projecter",
+            projecter,
+            false,
+            "function"
+        );
+
+        var results = [];
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
+        for (const storename of storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+
+            results.push(
+                njodb.aggregateStoreDataSync(
+                    storepath,
+                    selecter,
+                    indexer,
+                    projecter
+                )
+            );
+        }
+
+        return reduce.aggregateReduce(results);
     }
 
     async update(selecter, updater) {
@@ -282,6 +492,31 @@ class Database {
         return  reduce.updateReduce(results);
     }
 
+    updateSync(selecter, updater) {
+        utils.checkValue("selecter", selecter, true, "function");
+        utils.checkValue("updater", updater, true, "function");
+
+        var results = [];
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
+        for (const storename of storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+            const tempstorename = [storename, Date.now(), "tmp"].join(".");
+            const tempstorepath = path.join(this.properties.temppath, tempstorename);
+
+            results.push(
+                njodb.updateStoreDataSync(
+                    storepath,
+                    selecter,
+                    updater,
+                    tempstorepath
+                )
+            );
+        }
+
+        return  reduce.updateReduce(results);
+    }
+
     async delete(selecter) {
         utils.checkValue("selecter", selecter, true, "function");
 
@@ -307,50 +542,27 @@ class Database {
         return reduce.deleteReduce(results);
     }
 
-    async aggregate(selecter, indexer, projecter) {
+    deleteSync(selecter) {
         utils.checkValue("selecter", selecter, true, "function");
-        utils.checkValue("indexer", indexer, true, "function");
-        utils.checkValue("projecter", projecter, false, "function");
 
-        var promises = [];
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+        var results = [];
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
         for (const storename of storenames) {
             const storepath = path.join(this.properties.datapath, storename);
+            const tempstorename = [storename, Date.now(), "tmp"].join(".");
+            const tempstorepath = path.join(this.properties.temppath, tempstorename);
 
-            promises.push(
-                njodb.aggregateStoreData(
+            results.push(
+                njodb.deleteStoreDataSync(
                     storepath,
                     selecter,
-                    indexer,
-                    projecter,
-                    this.properties.lockoptions
+                    tempstorepath
                 )
             );
         }
 
-        const results = await Promise.all(promises);
-        return reduce.aggregateReduce(results);
-    }
-
-    async index(field) {
-        var promises = [];
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
-
-        for (const storename of storenames) {
-            const storepath = path.join(this.properties.datapath, storename);
-
-            promises.push(
-                njodb.indexStoreData(
-                    storepath,
-                    field,
-                    this.properties.lockoptions
-                )
-            );
-        }
-
-        const results = await Promise.all(promises);
-        return reduce.indexReduce(field, results, this.properties.datapath);
+        return reduce.deleteReduce(results);
     }
 }
 

@@ -2,6 +2,8 @@
 
 `njodb` is a persistent, partitioned, concurrency-controlled, Node.js JSON object database. Data is written to the file system and distributed across multiple files that are protected by read and write locks.
 
+By default, all methods are asynchronous and use read/write streams to improve performance and reduce memory requirements (this should be particularly useful for large databases). `njodb 0.4.0` introduced synchronous versions of the methods since, depending on the context, they could be more relevant or useful.
+
 ## Table of contents
 - [Install](#install)
 - [Test](#test)
@@ -9,19 +11,31 @@
 - [Constructor](#constructor)
   - [Database properties](#database-properties)
 - [Database management methods](#database-management-methods)
+  - [stats](#stats)
+  - [statsSync](#statsSync)
   - [grow](#grow)
+  - [growSync](#growSync)
   - [shrink](#shrink)
+  - [shrinkSync](#shrinkSync)
   - [resize](#resize)
+  - [resizeSync](#resizeSync)
   - [drop](#drop)
+  - [dropSync](#dropSync)
   - [getStats](#getStats)
+  - [getStatsSync](#getStatsSync)
   - [getProperties](#getproperties)
   - [setProperties](#setproperties)
 - [Data manipulation methods](#data-manipulation-methods)
   - [insert](#insert)
+  - [insertSync](#insertSync)
   - [select](#select)
+  - [selectSync](#selectSync)
   - [aggregate](#aggregate)
+  - [aggregateSync](#aggregateSync)
   - [update](#update)
+  - [updateSync](#updateSync)
   - [delete](#delete)
+  - [deleteSync](#deleteSync)
 
 ## Install
 ```js
@@ -118,48 +132,15 @@ Name|Type|Description|Default
 `datastores`|number|The number of data partitions that will be used|`5`
 `tempdir`|string|The name of the subdirectory of `root` where temporary data files will be stored|`tmp`
 `lockoptions`|object|The options that will be used by [proper-lockfile](https://www.npmjs.com/package/proper-lockfile) to lock data files|`{"stale": 5000, "update": 1000, "retries": { "retries": 5000, "minTimeout": 250, "maxTimeout": 5000, "factor": 0.15, "randomize": false } }`
-`debug`|boolean|Whether to print out debugging information to the console|`false`
 
 
 ## Database management methods
 
-### grow
+### stats
 
-`grow()`
+`stats`
 
-An asynchronous method that increases the number of `datastores` by one and redistributes the data across them.
-
-### shrink
-
-`shrink()`
-
-An asynchronous method that decreases the number of `datastores` by one and redistributes the data across them. If the current number of `datastores` is one, calling `shrink()` will throw an error.
-
-### resize
-
-`resize(size)`
-
-An asynchronous method that changes the number of `datastores` and redistributes the data across them.
-
-Parameters:
-
-Name|Type|Description
-----|----|-----------
-`size`|number|The number of `datastores` (must be greater than zero)
-
-### drop
-
-`drop()`
-
-An asynchronous method that deletes the database, including the data and temp directories, and the properties file.
-
-### getStats
-
-`getStats()`
-
-An asynchronous method that returns statistics about the `Database`.
-
-Returns a promises that resolves with the following information:
+Returns statistics about the `Database`. Resolves with the following information:
 
 Name|Description
 ----|-----------
@@ -171,21 +152,86 @@ Name|Description
 `mean`|The mean (i.e., average) number of records in each `datastore`
 `var`|The variance of the number of records across `datastores`
 `std`|The standard deviation of the number of records across `datastores`
-`start`|The timestamp of when the `getStats` call started
-`end`|The timestamp of when the `getStats` call finished
+`start`|The timestamp of when the `stats` call started
+`end`|The timestamp of when the `stats` call finished
+`elapsed`|The amount of time in milliseconds required to run the `stats` call
 `details`|An array of detailed stats for each `datastore`
+
+### statsSync
+
+A synchronous version of `stats`.
+
+### grow
+
+`grow()`
+
+Increases the number of `datastores` by one and redistributes the data across them.
+
+### growSync
+
+`growSync()`
+
+A synchronous version of `grow`.
+
+### shrink
+
+`shrink()`
+
+Decreases the number of `datastores` by one and redistributes the data across them. If the current number of `datastores` is one, calling `shrink()` will throw an error.
+
+### shrinkSync
+
+`shrinkSync()`
+
+A synchronous version of `shrink`.
+
+### resize
+
+`resize(size)`
+
+Changes the number of `datastores` and redistributes the data across them.
+
+Parameters:
+
+Name|Type|Description
+----|----|-----------
+`size`|number|The number of `datastores` (must be greater than zero)
+
+### resizeSync
+
+`resizeSync(size)`
+
+A synchronous version of `resize`.
+
+### drop
+
+`drop()`
+
+Deletes the database, including the data and temp directories, and the properties file.
+
+### dropSync
+
+`dropSync()`
+
+A synchronous version of `drop`.
+
+### getStats
+
+`getStats()`
+
+DEPRECATED: Currently an alias for `stats`. Will likely be dropped in a future version.
 
 ### getProperties
 
 `getProperties()`
 
-Returns the properties set for the `Database`.
+Returns the properties set for the `Database`. Will likely be deprecated in a future version.
 
 ### setProperties
 
 `setProperties(properties)`
 
-Sets the properties for the the `Database`.
+Sets the properties for the the `Database`. Will likely be deprecated in a future version.
 
 Parameters:
 
@@ -195,8 +241,6 @@ Name|Type|Description|Default
 
 
 ## Data manipulation methods
-
-All data manipulation methods are asynchronous and return a `Promise`.
 
 ### insert
 
@@ -217,7 +261,14 @@ Name|Type|Description
 `inserted`|number|The number of objects inserted into the `Database`
 `start`|date|The timestamp of when the insertions began
 `end`|date|The timestamp of when the insertions finished
+`elapsed`|The amount of time in milliseconds required to execute the `insert`
 `details`|array|An array of insertion results for each individual `datastore`
+
+### insertSync
+
+`insertSync(data)`
+
+A synchronous version of `insert`.
 
 ### select
 
@@ -241,6 +292,7 @@ Name|Type|Description
 `ignored`|number|The number of objects that were not selected from the `Database`
 `start`|date|The timestamp of when the selections began
 `end`|date|The timestamp of when the selections finished
+`elapsed`|The amount of time in milliseconds required to execute the `select`
 `details`|array|An array of selection results for each individual `datastore`
 
 Example with projection (returns only the `id` and `modified` fields but also creates a new one called `newID`):
@@ -251,6 +303,12 @@ db.select(
     function (record) { return {id: record.id, newID: record.id + 1, modified: record.modified }} // projecter (return a subset of fields and create a new one)
 );
 ```
+
+### selectSync
+
+`selectSync(selecter [, projector])`
+
+A synchronous version of `select`.
 
 ### aggregate
 
@@ -273,6 +331,7 @@ Name|Type|Description
 `data`|array|An array of index objects selected from the `Database`
 `start`|date|The timestamp of when the aggregations began
 `end`|date|The timestamp of when the aggregations finished
+`elapsed`|The amount of time in milliseconds required to execute the `aggregate`
 `details`|array|An array of selection results for each individual `datastore`
 
 Each index object contains the following:
@@ -385,6 +444,11 @@ Example aggregate data array:
 ]
 ```
 
+### aggregateSync
+
+`aggregate(selecter, indexer [, projecter])`
+
+A synchronous version of `aggregate`.
 
 ### update
 
@@ -407,7 +471,14 @@ Name|Type|Description
 `unchanged`|number|The number of objects that were not updated in the `Database`
 `start`|date|The timestamp of when the updates began
 `end`|date|The timestamp of when the updates finished
+`elapsed`|The amount of time in milliseconds required to execute the `update`
 `details`|array|An array of update results for each individual `datastore`
+
+### updateSync
+
+`updateSync(selecter, updater)`
+
+A synchronous version of `update`
 
 ### delete
 
@@ -429,6 +500,12 @@ Name|Type|Description
 `retained`|number|The number of objects that were not deleted from the `Database`
 `start`|date|The timestamp of when the deletions began
 `end`|date|The timestamp of when the deletions finished
+`elapsed`|The amount of time in milliseconds required to execute the `delete`
 `details`|array|An array of deletion results for each individual `datastore`
 
+### deleteSync
+
+`deleteSync(selecter)`
+
+A synchronous version of `delete`.
 

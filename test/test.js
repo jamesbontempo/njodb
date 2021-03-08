@@ -97,9 +97,9 @@ for (var i = 0; i < 50; i++) {
 
 var db;
 
-describe("NJODB tests", function() {
+describe("NJODB async tests", () => {
 
-    it("Constructor", function() {
+    it("Constructor", () => {
         db = new njodb.Database(__dirname);
         expect(db.getProperties()).to.deep.equal(defaults);
         expect(fs.existsSync(path.join(defaults.root, "njodb.properties"))).to.equal(true);
@@ -126,18 +126,6 @@ describe("NJODB tests", function() {
             expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selectsProjection);
             expect(results.selected).to.equal(selectsProjection.length);
             expect(results.ignored).to.equal(inserts.length - selectsProjection.length);
-        });
-    });
-
-    it("Update", async () => {
-        return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; }).then(results => {
-            expect(results.updated).to.equal(updates.length);
-            expect(results.unchanged).to.equal(inserts.length - updates.length);
-            db.select(function(record) { return record.lastName === "Smythe"; }).then(results => {
-                expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(updates);
-                expect(results.selected).to.equal(updates.length);
-                expect(results.ignored).to.equal(inserts.length - updates.length);
-            });
         });
     });
 
@@ -221,6 +209,20 @@ describe("NJODB tests", function() {
         });
     });
 
+    it("Update", async () => {
+        return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; })
+            .then(results => {
+                expect(results.updated).to.equal(updates.length);
+                expect(results.unchanged).to.equal(inserts.length - updates.length);})
+            .then(() => {
+                db.select(function(record) { return record.lastName === "Smythe"; }).then(results => {
+                    expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(updates);
+                    expect(results.selected).to.equal(updates.length);
+                    expect(results.ignored).to.equal(inserts.length - updates.length);
+                });
+            });
+    });
+
     it("Delete", async () => {
         return db.delete(function(record) { return record.id % 5 === 0; }).then(results => {
             expect(results.deleted).to.equal(deletes.length);
@@ -256,10 +258,167 @@ describe("NJODB tests", function() {
         })
     });
 
-    it("Drop", function() {
+    it("Drop", async () => {
         return db.drop().then((results) => {
             expect(results.dropped).to.equal(true);
         });
+    });
+
+});
+
+describe("NJODB sync tests", () => {
+
+    it("Constructor", () => {
+        db = new njodb.Database(__dirname);
+        expect(db.getProperties()).to.deep.equal(defaults);
+        expect(fs.existsSync(path.join(defaults.root, "njodb.properties"))).to.equal(true);
+        expect(fs.existsSync(path.join(defaults.root, "data"))).to.equal(true);
+        expect(fs.existsSync(path.join(defaults.root, "tmp"))).to.equal(true);
+    });
+
+    it("InsertSync", () => {
+        const results = db.insertSync(inserts);
+        expect(results.inserted).to.equal(inserts.length);
+    });
+
+    it("SelectSync", () => {
+        const results = db.selectSync(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; });
+        expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selects);
+        expect(results.selected).to.equal(selects.length);
+        expect(results.ignored).to.equal(inserts.length - selects.length);
+    });
+
+    it("SelectSync with projection", () => {
+        const results = db.selectSync(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; }, function(record) { return {id: record.id, fullName: record.firstName + " " + record.lastName, newFavoriteNumber: record.favoriteNumber * 5}; });
+        expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selectsProjection);
+        expect(results.selected).to.equal(selectsProjection.length);
+        expect(results.ignored).to.equal(inserts.length - selectsProjection.length);
+    });
+
+    it("AggregateSync", async () => {
+        const results = db.aggregateSync(function() { return true; }, function() { return true; });
+        expect(results.data[0].aggregates.length).to.equal(5);
+        for (var i = 0; i < results.data[0].aggregates.length; i++) {
+            switch(results.data[0].aggregates[i].field) {
+                case "id":
+                    expect(results.data[0].aggregates[i].data.min).to.equal(0);
+                    expect(results.data[0].aggregates[i].data.max).to.equal(49);
+                    expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                    expect(results.data[0].aggregates[i].data.sum).to.equal(1225);
+                    expect(results.data[0].aggregates[i].data.mean).to.equal(24.5);
+                    expect(Math.abs(results.data[0].aggregates[i].data.varp - 208.25) < 0.00000000001).to.equal(true);
+                    expect(Math.abs(results.data[0].aggregates[i].data.vars - 212.5) < 0.00000000001).to.equal(true);
+                    expect(Math.abs(results.data[0].aggregates[i].data.stdp - Math.sqrt(208.25)) < 0.00000000001).to.equal(true);
+                    expect(Math.abs(results.data[0].aggregates[i].data.stds - Math.sqrt(212.5)) < 0.00000000001).to.equal(true);
+                    break;
+                case "firstName":
+                    expect(results.data[0].aggregates[i].data.min).to.equal(minFirstName);
+                    expect(results.data[0].aggregates[i].data.max).to.equal(maxFirstName);
+                    expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                    expect(results.data[0].aggregates[i].data.sum).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.mean).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.varp).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.vars).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.stdp).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.stds).to.equal(undefined);
+                    break;
+                case "lastName":
+                    expect(results.data[0].aggregates[i].data.min).to.equal(minLastName);
+                    expect(results.data[0].aggregates[i].data.max).to.equal(maxLastName);
+                    expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                    expect(results.data[0].aggregates[i].data.sum).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.mean).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.varp).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.vars).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.stdp).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.stds).to.equal(undefined);
+                    break;
+                case "state":
+                    expect(results.data[0].aggregates[i].data.min).to.equal(minState);
+                    expect(results.data[0].aggregates[i].data.max).to.equal(maxState);
+                    expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                    expect(results.data[0].aggregates[i].data.sum).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.mean).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.varp).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.vars).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.stdp).to.equal(undefined);
+                    expect(results.data[0].aggregates[i].data.stds).to.equal(undefined);
+                    break;
+                case "favoriteNumber":
+                    expect(results.data[0].aggregates[i].data.min).to.equal(0);
+                    expect(results.data[0].aggregates[i].data.max).to.equal(49);
+                    expect(results.data[0].aggregates[i].data.count).to.equal(50);
+                    expect(results.data[0].aggregates[i].data.sum).to.equal(1225);
+                    expect(results.data[0].aggregates[i].data.mean).to.equal(24.5);
+                    expect(Math.abs(results.data[0].aggregates[i].data.varp - 208.25) < 0.00000000001).to.equal(true);
+                    expect(Math.abs(results.data[0].aggregates[i].data.vars - 212.5) < 0.00000000001).to.equal(true);
+                    expect(Math.abs(results.data[0].aggregates[i].data.stdp - Math.sqrt(208.25)) < 0.00000000001).to.equal(true);
+                    expect(Math.abs(results.data[0].aggregates[i].data.stds - Math.sqrt(212.5)) < 0.00000000001).to.equal(true);
+                    break;
+            }
+        }
+    });
+
+    it("AggregateSync with projection", async () => {
+        const results = db.aggregateSync(function() { return true; }, function() { return true; }, function(record) { return {id2: record.id * 2}; });
+        expect(results.data[0].aggregates.length).to.equal(1);
+        expect(results.data[0].aggregates[0].data.min).to.equal(0);
+        expect(results.data[0].aggregates[0].data.max).to.equal(98);
+        expect(results.data[0].aggregates[0].data.count).to.equal(50);
+        expect(results.data[0].aggregates[0].data.sum).to.equal(2450);
+        expect(results.data[0].aggregates[0].data.mean).to.equal(49);
+        expect(Math.abs(results.data[0].aggregates[0].data.varp - 833) < 0.00000000001).to.equal(true);
+        expect(Math.abs(results.data[0].aggregates[0].data.vars - 850) < 0.00000000001).to.equal(true);
+        expect(Math.abs(results.data[0].aggregates[0].data.stdp - Math.sqrt(833)) < 0.00000000001).to.equal(true);
+        expect(Math.abs(results.data[0].aggregates[0].data.stds - Math.sqrt(850)) < 0.00000000001).to.equal(true);
+    });
+
+    it("UpdateSync", () => {
+        var results;
+
+        results = db.updateSync(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; });
+        expect(results.updated).to.equal(updates.length);
+        expect(results.unchanged).to.equal(inserts.length - updates.length);
+
+        results = db.selectSync(function(record) { return record.lastName === "Smythe"; });
+        expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(updates);
+        expect(results.selected).to.equal(updates.length);
+        expect(results.ignored).to.equal(inserts.length - updates.length);
+    });
+
+    it("DeleteSync", () => {
+        const results = db.deleteSync(function(record) { return record.id % 5 === 0; });
+        expect(results.deleted).to.equal(deletes.length);
+        expect(results.retained).to.equal(inserts.length - deletes.length);
+    })
+
+    it("GrowSync", () => {
+        const results = db.growSync();
+        expect(results.stores).to.equal(defaults.datastores + 1);
+        expect(results.records).to.equal(inserts.length - deletes.length);
+    });
+
+    it("ResizeSync", () => {
+        const results = db.resizeSync(3);
+        expect(results.stores).to.equal(3);
+        expect(results.records).to.equal(inserts.length - deletes.length);
+    });
+
+    it("ShrinkSync", () => {
+        const results = db.shrinkSync();
+        expect(results.stores).to.equal(2);
+        expect(results.records).to.equal(inserts.length - deletes.length);
+    });
+
+    it("StatsSync", () => {
+        const results = db.getStatsSync();
+        expect(results.stores).to.equal(2);
+        expect(results.records).to.equal(inserts.length - deletes.length);
+    });
+
+    it("DropSync", () => {
+        const results = db.dropSync();
+        expect(results.dropped).to.equal(true);
     });
 
 });
