@@ -1,13 +1,14 @@
 {
   "name": "njodb",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
     "lib": "lib"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "mocha",
+    "coverage": "nyc npm run test"
   },
   "repository": {
     "type": "git",
@@ -24,9 +25,10 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "eslint": "^7.19.0",
     "chai": "^4.3.0",
-    "mocha": "^8.3.0"
+    "eslint": "^7.19.0",
+    "mocha": "^8.3.0",
+    "nyc": "^15.1.0"
   },
   "dependencies": {
     "proper-lockfile": "^4.1.2"

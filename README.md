@@ -83,17 +83,24 @@ db.insert(data).then( /* do something */ );
 
 Select some records from the database by supplying a function to find matches:
 ```js
-db.select(function(record) { return record.id === 1 || record.name === "Steve"}).then( /* do something */ );
+db.select(
+    function(record) { return record.id === 1 || record.name === "Steve"; }
+).then( /* do something */ );
 ```
 
 Update some records in the database by supplying a function to find matches and another function to update them:
 ```js
-db.update(function(record) { return record.name === "James"}, function(record) { record.nickname = "Bulldog"; return record; }).then( /* do something */ );
+db.update(
+    function(record) { return record.name === "James"; },
+    function(record) { record.nickname = "Bulldog"; return record; }
+).then( /* do something */ );
 ```
 
 Delete some records from the database by supplying a function to find matches:
 ```js
-db.delete(function(record) { return record.modified < Date.now()}).then( /* do something */ );
+db.delete(
+    function(record) { return record.modified < Date.now(); }
+).then( /* do something */ );
 ```
 
 Delete the database:
@@ -295,12 +302,12 @@ Name|Type|Description
 `elapsed`|The amount of time in milliseconds required to execute the `select`
 `details`|array|An array of selection results for each individual `datastore`
 
-Example with projection (returns only the `id` and `modified` fields but also creates a new one called `newID`):
+Example with projection (selects all records; returns only the `id` and `modified` fields, but also creates a new one called `newID`):
 
 ```js
 db.select(
-    function () { return true; }, // selecter (return all records)
-    function (record) { return {id: record.id, newID: record.id + 1, modified: record.modified }} // projecter (return a subset of fields and create a new one)
+    function () { return true; },
+    function (record) { return {id: record.id, newID: record.id + 1, modified: record.modified }; }
 );
 ```
 
@@ -355,20 +362,20 @@ Name|Description
 `stdp`|The population standard deviation of the values of the field (undefined if not a number)
 `stds`|The sample standard deviation of the values of the field (undefined if not a number)
 
-An example (returns aggregates for all records and fields, grouped by state and lastName fields):
+An example (generates aggregates for all records and fields, grouped by state and lastName):
 ```js
 db.aggregate(
-    function () { return true; }, // selecter (use all records)
-    function (record) { return [record.state, record.lastName]; } // indexer (group records by state and lastName)
+    function () { return true; },
+    function (record) { return [record.state, record.lastName]; }
 );
 ```
 
-Another example (returns aggregates for only two fields, grouped by state):
+Another example (generates aggregates for records with an ID less than 1000, grouped by state, but for only two fields):
 ```js
 db.aggregate(
-    function (record) { return record.id < 1000; }, // selecter (only use records with an ID less than 1000)
-    function (record) { return [record.state]; }, // indexer (group by state)
-    function (record) { return {favoriteNumber: record.favoriteNumber, firstName: record.firstName}; } // projecter (only return aggregate data for two fields)
+    function (record) { return record.id < 1000; },
+    function (record) { return [record.state]; },
+    function (record) { return {favoriteNumber: record.favoriteNumber, firstName: record.firstName}; }
 );
 ```
 

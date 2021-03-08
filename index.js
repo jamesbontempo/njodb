@@ -27,8 +27,8 @@ const saveProperties = (root, properties) => {
         "datadir": properties.datadir,
         "dataname": properties.dataname,
         "datastores": properties.datastores,
-        "tempdir": properties.tmpdir,
-        "lockoptions": properties.lockoptions
+        "lockoptions": properties.lockoptions,
+        "tempdir": properties.tmpdir
     };
     const propertiesFile = path.join(root, "njodb.properties");
     fs.writeFileSync(propertiesFile, JSON.stringify(properties, null, 4));
@@ -71,7 +71,7 @@ class Database {
         this.properties.dataname = (properties.dataname && typeof properties.dataname === "string") ? properties.dataname : defaults.dataname;
         this.properties.datastores = (properties.datastores && typeof properties.datastores === "number") ? properties.datastores : defaults.datastores;
         this.properties.tempdir = (properties.tempdir && typeof properties.tempdir === "string") ? properties.tempdir : defaults.tempdir;
-        this.properties.lockoptions = (properties.lockoptions && typeof this.properties.lockoptions === "object") ? properties.lockoptions : defaults.lockoptions;
+        this.properties.lockoptions = (properties.lockoptions && typeof properties.lockoptions === "object") ? properties.lockoptions : defaults.lockoptions;
         this.properties.datapath = path.join(this.properties.root, this.properties.datadir);
         this.properties.temppath = path.join(this.properties.root, this.properties.tempdir);
 
@@ -334,16 +334,7 @@ class Database {
 
         for (var i = 0; i < data.length; i++) {
             if (i === i % this.properties.datastores) records[i] = [];
-            try {
-                JSON.parse(JSON.stringify(data[i]));
-                records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
-            } catch (error) {
-                if (error instanceof SyntaxError) {
-                    console.error("SELECT: Problematic record at index " + i + ": " + data[i]);
-                } else {
-                    throw error;
-                }
-            }
+            records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
         }
 
         var stores = Array.from(Array(this.properties.datastores).keys());
