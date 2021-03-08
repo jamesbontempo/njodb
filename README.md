@@ -1,8 +1,8 @@
 # njodb
 
-`njodb` is a persistent, partitioned, concurrency-controlled, Node.js JSON object database. Data is written to the file system and distributed across multiple files that are protected by read and write locks.
+`njodb` is a persistent, partitioned, concurrency-controlled, Node.js JSON object database. Data is written to the file system and distributed across multiple files that are protected by read and write locks. By default, all methods are asynchronous and use read/write streams to improve performance and reduce memory requirements (this should be particularly useful for large databases).
 
-By default, all methods are asynchronous and use read/write streams to improve performance and reduce memory requirements (this should be particularly useful for large databases). `njodb 0.4.0` introduced synchronous versions of the methods since, depending on the context, they could be more relevant or useful.
+`njodb 0.4.0` introduced synchronous versions of the methods since, depending on the context, they could be more relevant or useful. This version also included the `grow`, `shrink`, and `resize` methods for easily adjusting the number of partitions and redistributing data across them.
 
 ## Table of contents
 - [Install](#install)
