@@ -4,6 +4,8 @@
 
 `njodb 0.4.0` introduced synchronous versions of the methods since, depending on the context, they could be more relevant or useful. This version also included the `grow`, `shrink`, and `resize` methods for easily adjusting the number of partitions and redistributing data across them.
 
+`njodb 0.4.3` introduced the `insertFile` method for easily importing JSON data from a file into the database.
+
 ## Table of contents
 - [Install](#install)
 - [Test](#test)
@@ -28,6 +30,8 @@
 - [Data manipulation methods](#data-manipulation-methods)
   - [insert](#insert)
   - [insertSync](#insertSync)
+  - [insertFile](#insertFile)
+  - [insertFileSync](#insertFileSync)
   - [select](#select)
   - [selectSync](#selectSync)
   - [aggregate](#aggregate)
@@ -36,6 +40,7 @@
   - [updateSync](#updateSync)
   - [delete](#delete)
   - [deleteSync](#deleteSync)
+- [Finding and fixing problematic data](#finding-and-fixing-problematic-data)
 
 ## Install
 ```js
@@ -84,22 +89,22 @@ db.insert(data).then( /* do something */ );
 Select some records from the database by supplying a function to find matches:
 ```js
 db.select(
-    function(record) { return record.id === 1 || record.name === "Steve"; }
+    record => record.id === 1 || record.name === "Steve"
 ).then( /* do something */ );
 ```
 
 Update some records in the database by supplying a function to find matches and another function to update them:
 ```js
 db.update(
-    function(record) { return record.name === "James"; },
-    function(record) { record.nickname = "Bulldog"; return record; }
+    record => record.name === "James",
+    record => { record.nickname = "Bulldog"; return record; }
 ).then( /* do something */ );
 ```
 
 Delete some records from the database by supplying a function to find matches:
 ```js
 db.delete(
-    function(record) { return record.modified < Date.now(); }
+    record => record.modified < Date.now()
 ).then( /* do something */ );
 ```
 
@@ -268,7 +273,7 @@ Name|Type|Description
 `inserted`|number|The number of objects inserted into the `Database`
 `start`|date|The timestamp of when the insertions began
 `end`|date|The timestamp of when the insertions finished
-`elapsed`|The amount of time in milliseconds required to execute the `insert`
+`elapsed`|number|The amount of time in milliseconds required to execute the `insert`
 `details`|array|An array of insertion results for each individual `datastore`
 
 ### insertSync
@@ -276,6 +281,33 @@ Name|Type|Description
 `insertSync(data)`
 
 A synchronous version of `insert`.
+
+### insertFile
+
+`insertFile(file)`
+
+Inserts data into the `database` from a file containing JSON data. The file itself does not need to be a valid JSON object, rather it should contain a single stringified JSON object per line. Blank lines are ignored and problematic data is collected in an `errors` array.
+
+Resolves with an object containing results from the `insertFile`:
+
+Name|Type|Description
+----|----|-----------
+`inspected`|number|The number of lines of the file inspected
+`inserted`|number|The number of objects inserted into the `Database`
+`blanks`|number|The number of blank lines in the file
+`errors`|array|An array of problematic records in the file
+`start`|date|The timestamp of when the insertions began
+`end`|date|The timestamp of when the insertions finished
+`elapsed`|number|The amount of time in milliseconds required to execute the `insert`
+`details`|array|An array of insertion results for each individual `datastore`
+
+An example data file, `data.json`, is included in the `test` subdirectory. Among many valid records, it also includes blank lines and a malformed JSON object.
+
+### insertFileSync
+
+`insertFileSync(file)`
+
+A synchronous version of `insertFile`.
 
 ### select
 
@@ -297,10 +329,11 @@ Name|Type|Description
 `data`|array|An array of objects selected from the `Database`
 `selected`|number|The number of objects selected from the `Database`
 `ignored`|number|The number of objects that were not selected from the `Database`
+`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
 `start`|date|The timestamp of when the selections began
 `end`|date|The timestamp of when the selections finished
-`elapsed`|The amount of time in milliseconds required to execute the `select`
-`details`|array|An array of selection results for each individual `datastore`
+`elapsed`|number|The amount of time in milliseconds required to execute the `select`
+`details`|array|An array of selection results, including error details, for each individual `datastore`
 
 Example with projection (selects all records; returns only the `id` and `modified` fields, but also creates a new one called `newID`):
 
@@ -336,10 +369,13 @@ Resolves with an object containing results from the `aggregate`:
 Name|Type|Description
 ----|----|-----------
 `data`|array|An array of index objects selected from the `Database`
+`indexed`|number|The number of records that were indexable (i.e., processable by the indexer function)
+`unindexed`|number|The number of records that were un-indexable
+`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
 `start`|date|The timestamp of when the aggregations began
 `end`|date|The timestamp of when the aggregations finished
-`elapsed`|The amount of time in milliseconds required to execute the `aggregate`
-`details`|array|An array of selection results for each individual `datastore`
+`elapsed`|number|The amount of time in milliseconds required to execute the `aggregate`
+`details`|array|An array of selection results, including error details, for each individual `datastore`
 
 Each index object contains the following:
 
@@ -476,10 +512,11 @@ Name|Type|Description
 ----|----|-----------
 `updated`|number|The number of objects updated in the `Database`
 `unchanged`|number|The number of objects that were not updated in the `Database`
+`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
 `start`|date|The timestamp of when the updates began
 `end`|date|The timestamp of when the updates finished
-`elapsed`|The amount of time in milliseconds required to execute the `update`
-`details`|array|An array of update results for each individual `datastore`
+`elapsed`|number|The amount of time in milliseconds required to execute the `update`
+`details`|array|An array of update results, including error details, for each individual `datastore`
 
 ### updateSync
 
@@ -505,10 +542,11 @@ Name|Type|Description
 ----|----|-----------
 `deleted`|number|The number of objects deleted from the `Database`
 `retained`|number|The number of objects that were not deleted from the `Database`
+`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
 `start`|date|The timestamp of when the deletions began
 `end`|date|The timestamp of when the deletions finished
-`elapsed`|The amount of time in milliseconds required to execute the `delete`
-`details`|array|An array of deletion results for each individual `datastore`
+`elapsed`|number|The amount of time in milliseconds required to execute the `delete`
+`details`|array|An array of deletion results, including error details, for each individual `datastore`
 
 ### deleteSync
 
@@ -516,3 +554,29 @@ Name|Type|Description
 
 A synchronous version of `delete`.
 
+
+## Finding and fixing problematic data
+
+Many methods return information about problematic records encountered (i.e., records that are not parseable using `JSON.parse()`); both a count of them, as well as details about them in the `details` array. The objects in the `details` array - one for each `datastore` - contain an `errors` array that is a collection of objects about problematic records in the `datastore`. Each error object includes the line of the `datastore` file where the problematic record was found as well as a copy of the record itself. With this information, if one wants to address these problematic data they can simply load the `datastore` file in a text editor and either correct the record or remove it.
+
+Here is an example of the `details` for a `datastore` that contains a problematic record. As you can see, the record is on the first line of the file, and the problem is that the `lastname` key name is missing an enclosing quote. Simply adding the quote fixes the record.
+
+```js
+{
+    store: '/Users/jamesbontempo/github/njodb/data/data.0.json',
+    size: 13362190,
+    records: 90157,
+    errors: [
+      {
+        line: 1,
+        data: {
+          error: '{"id":100,"firstName":"Patricia","lastName:"Brown","state":"California","birthdate":"1980-02-08","favoriteNumbers":[3,3,627],"favoriteNumber":356,"modified":1615242040534}'
+        }
+      }
+    ],
+    created: 2021-03-09T01:27:36.431Z,
+    modified: 2021-03-09T15:22:22.372Z,
+    start: 1615303347030,
+    end: 1615303347299
+  }
+ ```

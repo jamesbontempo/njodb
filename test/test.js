@@ -53,6 +53,7 @@ const badProperties = {
 const firstNames = ["James", "John", "Robert", "Michael", "William", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth"];
 const lastNames = ["Smith", "Johsnon", "Williams", "Jones", "Brown", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
 const states = ["Maryland", "District of Columbia", "Virginia", "California", "Connecticut", "Illinois"];
+const regions = ["Northeast", "Southeast", "Midwest", "Southwest", "West"];
 
 var inserts = [];
 var selects = [];
@@ -91,6 +92,10 @@ for (var i = 0; i < 50; i++) {
         favoriteNumber: i,
     };
 
+    if (Math.random() < 0.5) {
+        data.region = regions[Math.floor(Math.random()*regions.length)];
+    }
+
     inserts.push(data);
 
     if (firstName === "James" && lastName !== "Smith") {
@@ -105,15 +110,15 @@ for (var i = 0; i < 50; i++) {
     }
 
     if (lastName === "Smith") {
-        updates.push(
-            {
-                id: i,
-                firstName: firstName,
-                lastName:"Smythe",
-                state: state,
-                favoriteNumber: i,
-            }
-        );
+        var update = {
+            id: i,
+            firstName: firstName,
+            lastName:"Smythe",
+            state: state,
+            favoriteNumber: i,
+        };
+        if (data.region !== undefined) update.region = data.region;
+        updates.push(update);
     }
 
     if (i % 5 === 0) {
@@ -157,7 +162,7 @@ describe("NJODB async tests", () => {
 
     it("Aggregates data asynchronously", async () => {
         return db.aggregate(function() { return true; }, function() { return true; }).then(results => {
-            expect(results.data[0].aggregates.length).to.equal(5);
+            expect(results.data[0].aggregates.length).to.equal(6);
             for (const aggregate of results.data[0].aggregates) {
                 const field = aggregate.field;
                 const data = aggregate.data;
@@ -239,6 +244,14 @@ describe("NJODB async tests", () => {
         });
     });
 
+    it("Aggregrates data asynchronously and skips some", async () => {
+        return db.aggregate(function() { return true; }, function(record) { return record.region; }).then(results => {
+            const indexed = inserts.filter(record => record.region !== undefined).length;
+            expect(results.indexed).to.equal(indexed);
+            expect(results.unindexed).to.equal(inserts.length - indexed);
+        });
+    });
+
     it("Updates data asynchronously", async () => {
         return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; })
             .then(results => {
@@ -288,6 +301,18 @@ describe("NJODB async tests", () => {
         })
     });
 
+    it("Inserts some data from a file asynchronously", async () => {
+        return db.insertFile(path.join(__dirname, "data.json")).then(results => {
+            expect(results.inserted).to.equal(50);
+            expect(results.errors.length).to.equal(1);
+        });
+    });
+
+    it("Inserts some more data asynchronously", async () => {
+        return db.insert(inserts).then(results => {
+            expect(results.inserted).to.equal(inserts.length);
+        });
+    });
 
     it("Drops database asynchronously", async () => {
         return db.drop().then((results) => {
@@ -329,7 +354,7 @@ describe("NJODB sync tests", () => {
 
     it("Aggregates data synchronously", async () => {
         const results = db.aggregateSync(function() { return true; }, function() { return true; });
-        expect(results.data[0].aggregates.length).to.equal(5);
+        expect(results.data[0].aggregates.length).to.equal(6);
         for (const aggregate of results.data[0].aggregates) {
             const field = aggregate.field;
             const data = aggregate.data;
@@ -428,6 +453,13 @@ describe("NJODB sync tests", () => {
         expect(Math.abs(aggregates.stds - Math.sqrt(vars)) < 0.00000000001).to.equal(true);
     });
 
+    it("Aggregrates data synchronously and skips some", () => {
+        const results = db.aggregateSync(function() { return true; }, function(record) { return record.region; });
+        const indexed = inserts.filter(record => record.region !== undefined).length;
+        expect(results.indexed).to.equal(indexed);
+        expect(results.unindexed).to.equal(inserts.length - indexed);
+    });
+
     it("Updates data synchronously", () => {
         var results;
 
@@ -471,6 +503,11 @@ describe("NJODB sync tests", () => {
         expect(results.records).to.equal(inserts.length - deletes.length);
     });
 
+    it("Inserts some data from a file synchronously", () => {
+        const results = db.insertFileSync(path.join(__dirname, "data.json"));
+        expect(results.inserted).to.equal(50);
+        expect(results.errors.length).to.equal(1);
+    })
 
     it("Drops database synchronously", () => {
         const results = db.dropSync();
@@ -507,6 +544,7 @@ describe("NJODB error tests", () => {
 
     it("Gets database stats asynchronously and finds bad record", async () => {
         return db.getStats().then(results => {
+            expect(results.records).to.equal(inserts.length * 2);
             expect(results.errors).to.equal(1);
         });
     })
@@ -527,6 +565,53 @@ describe("NJODB error tests", () => {
         expect(results.errors).to.equal(1);
     });
 
+    it("Tries to insert data that is not an array", () => {
+        let error = null;
+
+        try {
+            db.insertSync("test");
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to insert an empty data array", () => {
+        let error = null;
+
+        try {
+            db.insertSync([]);
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to select records without providing a selecter function", () => {
+        let error = null;
+
+        try {
+            db.selectSync();
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Aggregates data asynchronously and finds bad record", async () => {
+        return db.aggregate(function() { return true; }, function(record) { return record.id; }).then(results => {
+            expect(results.errors).to.equal(1);
+        });
+    });
+
+    it("Aggregates data synchronously and finds bad record", () => {
+        const results = db.aggregateSync(function() { return true; }, function(record) { return record.id; });
+        expect(results.errors).to.equal(1);
+    });
+
     it("Updates data asynchronously and finds bad record", async () => {
         return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; }).then(results => {
             expect(results.errors).to.equal(1);
@@ -538,11 +623,11 @@ describe("NJODB error tests", () => {
         expect(results.errors).to.equal(1);
     });
 
-    it("Aggregate indexer doesn't return a value", () => {
+    it("Tries to use aggregate indexer that doesn't return a value", () => {
         let error = null;
 
         try {
-            db.aggregateSync(function() { return true; }, function(record) { record.state !== undefined});
+            db.aggregateSync(() => true, function(record) { record.state !== undefined});
         } catch(e) {
             error = e;
         }
@@ -555,6 +640,18 @@ describe("NJODB error tests", () => {
 
         try {
             db.resizeSync(0);
+        } catch (e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to resize database to a non-number value", () => {
+        let error = null;
+
+        try {
+            db.resizeSync("three");
         } catch (e) {
             error = e;
         }

@@ -27,8 +27,8 @@ const saveProperties = (root, properties) => {
         "datadir": properties.datadir,
         "dataname": properties.dataname,
         "datastores": properties.datastores,
-        "lockoptions": properties.lockoptions,
-        "tempdir": properties.tmpdir
+        "tempdir": properties.tempdir,
+        "lockoptions": properties.lockoptions
     };
     const propertiesFile = path.join(root, "njodb.properties");
     fs.writeFileSync(propertiesFile, JSON.stringify(properties, null, 4));
@@ -237,57 +237,27 @@ class Database {
     }
 
     async drop() {
-        var promises = [];
-        var results = [];
+        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
-
-        for (const storename of storenames) {
-            const storepath = path.join(this.properties.datapath, storename);
-
-            promises.push(
-                utils.deleteFile(
-                    storepath,
-                    this.properties.lockoptions
-                )
-            );
-        }
-
-        promises.push(
-            [
-                utils.deleteDirectory(this.properties.temppath, this.properties.lockoptions),
-                utils.deleteDirectory(this.properties.datapath, this.properties.lockoptions),
-                utils.deleteFile(path.join(this.properties.root, "njodb.properties"))
-            ]
+        const results = await njodb.dropEverything(
+            this.properties.root,
+            this.properties.datapath,
+            storenames,
+            this.properties.temppath,
+            this.properties.lockoptions
         );
-
-        results = await Promise.all(promises);
 
         return reduce.dropReduce(results);
     }
 
     dropSync() {
-        var results = [];
-
         const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
-        for (const storename of storenames) {
-            const storepath = path.join(this.properties.datapath, storename);
-
-            results.push(
-                utils.deleteFileSync(
-                    storepath,
-                    true
-                )
-            )
-        }
-
-        results.push(
-            [
-                utils.deleteDirectorySync(this.properties.temppath, true),
-                utils.deleteDirectorySync(this.properties.datapath, true),
-                utils.deleteFileSync(path.join(this.properties.root, "njodb.properties"))
-            ]
+        const results = njodb.dropEverythingSync(
+            this.properties.root,
+            this.properties.datapath,
+            storenames,
+            this.properties.temppath
         );
 
         return reduce.dropReduce(results);
@@ -327,7 +297,7 @@ class Database {
     }
 
     insertSync(data) {
-        utils.checkValue("data", data, true, "array", function(data) { return data.length > 0; });
+        utils.checkValue("data", data, true, "array", data => data.length > 0);
 
         var results = [];
         var records = [];
@@ -354,6 +324,37 @@ class Database {
         }
 
         return reduce.insertReduce(results);
+    }
+
+    async insertFile(file) {
+        utils.checkValue("file", file, true, "string", function(file) { return fs.existsSync(file); });
+
+        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+
+        const results = await njodb.insertFileData(
+            file,
+            this.properties.datapath,
+            storenames,
+            this.properties.lockoptions
+        );
+
+        return results;
+    }
+
+    insertFileSync(file) {
+        utils.checkValue("file", file, true, "string", function(file) { return fs.existsSync(file); });
+
+        const data = fs.readFileSync(file, "utf8").split("\n");
+
+        const checked = utils.checkData(data);
+
+        const results = this.insertSync(checked.data);
+
+        results.inspected = checked.inspected;
+        results.errors = checked.errors;
+        results.blanks = checked.blanks;
+
+        return results;
     }
 
     async select(selecter, projecter) {
