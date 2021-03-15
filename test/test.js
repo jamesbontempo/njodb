@@ -58,6 +58,7 @@ const regions = ["Northeast", "Southeast", "Midwest", "Southwest", "West"];
 var inserts = [];
 var selects = [];
 var selectsProjection = [];
+var regionCount = 0;
 var updates = [];
 var deletes = [];
 
@@ -94,6 +95,7 @@ for (var i = 0; i < 50; i++) {
 
     if (Math.random() < 0.5) {
         data.region = regions[Math.floor(Math.random()*regions.length)];
+        regionCount++;
     }
 
     inserts.push(data);
@@ -161,8 +163,9 @@ describe("NJODB async tests", () => {
     });
 
     it("Aggregates data asynchronously", async () => {
-        return db.aggregate(function() { return true; }, function() { return true; }).then(results => {
+        return db.aggregate(() => true, () => true).then(results => {
             expect(results.data[0].aggregates.length).to.equal(6);
+            expect(results.data[0].count).to.equal(50);
             for (const aggregate of results.data[0].aggregates) {
                 const field = aggregate.field;
                 const data = aggregate.data;
@@ -170,7 +173,6 @@ describe("NJODB async tests", () => {
                     case "id":
                         expect(data.min).to.equal(0);
                         expect(data.max).to.equal(49);
-                        expect(data.count).to.equal(50);
                         expect(data.sum).to.equal(1225);
                         expect(data.mean).to.equal(24.5);
                         expect(Math.abs(data.varp - 208.25) < 0.00000000001).to.equal(true);
@@ -181,7 +183,6 @@ describe("NJODB async tests", () => {
                     case "firstName":
                         expect(data.min).to.equal(minFirstName);
                         expect(data.max).to.equal(maxFirstName);
-                        expect(data.count).to.equal(50);
                         expect(data.sum).to.equal(undefined);
                         expect(data.mean).to.equal(undefined);
                         expect(data.varp).to.equal(undefined);
@@ -192,7 +193,6 @@ describe("NJODB async tests", () => {
                     case "lastName":
                         expect(data.min).to.equal(minLastName);
                         expect(data.max).to.equal(maxLastName);
-                        expect(data.count).to.equal(50);
                         expect(data.sum).to.equal(undefined);
                         expect(data.mean).to.equal(undefined);
                         expect(data.varp).to.equal(undefined);
@@ -203,7 +203,6 @@ describe("NJODB async tests", () => {
                     case "state":
                         expect(data.min).to.equal(minState);
                         expect(data.max).to.equal(maxState);
-                        expect(data.count).to.equal(50);
                         expect(data.sum).to.equal(undefined);
                         expect(data.mean).to.equal(undefined);
                         expect(data.varp).to.equal(undefined);
@@ -214,7 +213,6 @@ describe("NJODB async tests", () => {
                     case "favoriteNumber":
                         expect(data.min).to.equal(0);
                         expect(data.max).to.equal(49);
-                        expect(data.count).to.equal(50);
                         expect(data.sum).to.equal(1225);
                         expect(data.mean).to.equal(24.5);
                         expect(Math.abs(data.varp - 208.25) < 0.00000000001).to.equal(true);
@@ -228,13 +226,13 @@ describe("NJODB async tests", () => {
     });
 
     it("Aggregates data with projection asynchronously", async () => {
-        return db.aggregate(function() { return true; }, function() { return true; }, function(record) { return {id2: record.id * 2}; }).then(results => {
+        return db.aggregate(() => true, () => true, record => { return {id2: record.id * 2}; }).then(results => {
+            expect(results.data[0].count).to.equal(50);
             const aggregates = results.data[0].aggregates;
-            const data = results.data[0].aggregates[0].data;
             expect(aggregates.length).to.equal(1);
+            const data = aggregates[0].data;
             expect(data.min).to.equal(0);
             expect(data.max).to.equal(98);
-            expect(data.count).to.equal(50);
             expect(data.sum).to.equal(2450);
             expect(data.mean).to.equal(49);
             expect(Math.abs(data.varp - 833) < 0.00000000001).to.equal(true);
@@ -353,7 +351,8 @@ describe("NJODB sync tests", () => {
     });
 
     it("Aggregates data synchronously", async () => {
-        const results = db.aggregateSync(function() { return true; }, function() { return true; });
+        const results = db.aggregateSync(() => true, () => true);
+        expect(results.data[0].count).to.equal(50);
         expect(results.data[0].aggregates.length).to.equal(6);
         for (const aggregate of results.data[0].aggregates) {
             const field = aggregate.field;
@@ -362,7 +361,6 @@ describe("NJODB sync tests", () => {
                 case "id":
                     expect(data.min).to.equal(0);
                     expect(data.max).to.equal(49);
-                    expect(data.count).to.equal(50);
                     expect(data.sum).to.equal(1225);
                     expect(data.mean).to.equal(24.5);
                     expect(Math.abs(data.varp - 208.25) < 0.00000000001).to.equal(true);
@@ -373,7 +371,6 @@ describe("NJODB sync tests", () => {
                 case "firstName":
                     expect(data.min).to.equal(minFirstName);
                     expect(data.max).to.equal(maxFirstName);
-                    expect(data.count).to.equal(50);
                     expect(data.sum).to.equal(undefined);
                     expect(data.mean).to.equal(undefined);
                     expect(data.varp).to.equal(undefined);
@@ -384,7 +381,6 @@ describe("NJODB sync tests", () => {
                 case "lastName":
                     expect(data.min).to.equal(minLastName);
                     expect(data.max).to.equal(maxLastName);
-                    expect(data.count).to.equal(50);
                     expect(data.sum).to.equal(undefined);
                     expect(data.mean).to.equal(undefined);
                     expect(data.varp).to.equal(undefined);
@@ -395,7 +391,6 @@ describe("NJODB sync tests", () => {
                 case "state":
                     expect(data.min).to.equal(minState);
                     expect(data.max).to.equal(maxState);
-                    expect(data.count).to.equal(50);
                     expect(data.sum).to.equal(undefined);
                     expect(data.mean).to.equal(undefined);
                     expect(data.varp).to.equal(undefined);
@@ -406,7 +401,6 @@ describe("NJODB sync tests", () => {
                 case "favoriteNumber":
                     expect(data.min).to.equal(0);
                     expect(data.max).to.equal(49);
-                    expect(data.count).to.equal(50);
                     expect(data.sum).to.equal(1225);
                     expect(data.mean).to.equal(24.5);
                     expect(Math.abs(data.varp - 208.25) < 0.00000000001).to.equal(true);
@@ -419,7 +413,9 @@ describe("NJODB sync tests", () => {
     });
 
     it("Aggregates filtered data with projection synchronously", async () => {
-        const results = db.aggregateSync(function() { return true; }, function(record) { return record.state; }, function(record) { return {id2: record.id * 2}; });
+        const results = db.aggregateSync(() => true, record => record.state, record => { return {id2: record.id * 2}; });
+
+        expect(results.data.length).to.equal(states.length);
 
         var min = Infinity;
         var max = 0;
@@ -435,22 +431,21 @@ describe("NJODB sync tests", () => {
             ss += Math.pow(record.id * 2, 2);
         });
 
-        const aggregates = results.data.filter(data => data.index === "Maryland")[0].aggregates[0].data;
-
-        expect(results.data.length).to.equal(states.length);
-        expect(aggregates.min).to.equal(min);
-        expect(aggregates.max).to.equal(max);
-        expect(aggregates.count).to.equal(maryland.length);
-        expect(aggregates.sum).to.equal(sum);
-        expect(aggregates.mean).to.equal(sum/maryland.length)
-
         const varp = (ss - (Math.pow(sum, 2)/maryland.length))/maryland.length;
         const vars = (ss - (Math.pow(sum, 2)/maryland.length))/(maryland.length - 1);
 
-        expect(Math.abs(aggregates.varp - varp) < 0.00000000001).to.equal(true);
-        expect(Math.abs(aggregates.vars - vars) < 0.00000000001).to.equal(true);
-        expect(Math.abs(aggregates.stdp - Math.sqrt(varp)) < 0.00000000001).to.equal(true);
-        expect(Math.abs(aggregates.stds - Math.sqrt(vars)) < 0.00000000001).to.equal(true);
+        const index = results.data.filter(data => data.index === "Maryland")[0];
+        expect(index.count).to.equal(maryland.length);
+
+        const aggregates = results.data.filter(data => data.index === "Maryland")[0].aggregates[0];
+        expect(aggregates.data.min).to.equal(min);
+        expect(aggregates.data.max).to.equal(max);
+        expect(aggregates.data.sum).to.equal(sum);
+        expect(aggregates.data.mean).to.equal(sum/maryland.length);
+        expect(Math.abs(aggregates.data.varp - varp) < 0.00000000001).to.equal(true);
+        expect(Math.abs(aggregates.data.vars - vars) < 0.00000000001).to.equal(true);
+        expect(Math.abs(aggregates.data.stdp - Math.sqrt(varp)) < 0.00000000001).to.equal(true);
+        expect(Math.abs(aggregates.data.stds - Math.sqrt(vars)) < 0.00000000001).to.equal(true);
     });
 
     it("Aggregrates data synchronously and skips some", () => {
@@ -497,17 +492,17 @@ describe("NJODB sync tests", () => {
         expect(results.records).to.equal(inserts.length - deletes.length);
     });
 
-    it("Gets statistics about the database synchronously", () => {
-        const results = db.getStatsSync();
-        expect(results.stores).to.equal(1);
-        expect(results.records).to.equal(inserts.length - deletes.length);
-    });
-
     it("Inserts some data from a file synchronously", () => {
         const results = db.insertFileSync(path.join(__dirname, "data.json"));
         expect(results.inserted).to.equal(50);
         expect(results.errors.length).to.equal(1);
-    })
+    });
+
+    it("Gets statistics about the database synchronously", () => {
+        const results = db.getStatsSync();
+        expect(results.stores).to.equal(1);
+        expect(results.records).to.equal(inserts.length - deletes.length + 50);
+    });
 
     it("Drops database synchronously", () => {
         const results = db.dropSync();
@@ -538,7 +533,7 @@ describe("NJODB error tests", () => {
         const results = db.insertSync(inserts);
         expect(results.inserted).to.equal(inserts.length);
 
-        const badData = "{\"id\":5,\"firstName\":\"James\",\"lastName:\"Marshall\"}";
+        const badData = "{\"id\":5,\"firstName\":\"James\",\"lastName:\"Marshall\"}\n";
         fs.appendFileSync(path.join(__dirname, "data", "data.0.json"), badData);
     });
 
@@ -619,7 +614,7 @@ describe("NJODB error tests", () => {
     });
 
     it("Updates data synchronously and finds bad record", () => {
-        const results = db.updateSync(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; });
+        const results = db.updateSync(function(record) { return record.lastName === "Smythe"; }, function(record) { record.lastName = "Smithe"; return record; });
         expect(results.errors).to.equal(1);
     });
 
@@ -698,15 +693,15 @@ describe("NJODB error tests", () => {
         expect(error).to.be.an("Error");
     });
 
+    it("Deletes data synchronously and finds bad record", () => {
+        const results = db.deleteSync(function(record) { return record.firstName === "James"; });
+        expect(results.errors).to.equal(1);
+    });
+    
     it("Deletes data asynchronously and finds bad record", async () => {
         return db.delete(function(record) { return record.lastName === "Williams"; }).then(results => {
             expect(results.errors).to.equal(1);
         });
-    });
-
-    it("Deletes data synchronously and finds bad record", () => {
-        const results = db.deleteSync(function(record) { return record.firstName === "James"; });
-        expect(results.errors).to.equal(1);
     });
 
     it("Drops database synchronously", () => {

@@ -81,7 +81,14 @@ class Database {
     }
 
     async stats() {
+        var stats = {
+            root: path.resolve(this.properties.root),
+            data: path.resolve(this.properties.datapath),
+            temp: path.resolve(this.properties.temppath)
+        };
+
         var promises = [];
+
         const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
 
         for (const storename of storenames) {
@@ -96,11 +103,19 @@ class Database {
         }
 
         const results = await Promise.all(promises);
-        return reduce.getStatsReduce(results);
+
+        return Object.assign(stats, reduce.getStatsReduce(results));
     }
 
     statsSync() {
+        var stats = {
+            root: path.resolve(this.properties.root),
+            data: path.resolve(this.properties.datapath),
+            temp: path.resolve(this.properties.temppath)
+        };
+
         var results = [];
+
         const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
         for (const storename of storenames) {
@@ -108,7 +123,7 @@ class Database {
             results.push(njodb.statsStoreDataSync(storepath));
         }
 
-        return reduce.getStatsReduce(results);
+        return Object.assign(stats, reduce.getStatsReduce(results));
     }
 
     async getStats() {

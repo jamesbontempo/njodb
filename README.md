@@ -13,33 +13,19 @@
 - [Constructor](#constructor)
   - [Database properties](#database-properties)
 - [Database management methods](#database-management-methods)
-  - [stats](#stats)
-  - [statsSync](#statsSync)
-  - [grow](#grow)
-  - [growSync](#growSync)
-  - [shrink](#shrink)
-  - [shrinkSync](#shrinkSync)
-  - [resize](#resize)
-  - [resizeSync](#resizeSync)
-  - [drop](#drop)
-  - [dropSync](#dropSync)
-  - [getStats](#getStats)
-  - [getStatsSync](#getStatsSync)
-  - [getProperties](#getproperties)
-  - [setProperties](#setproperties)
+  - [stats](#stats) / [statsSync](#statsSync)
+  - [grow](#grow) / [growSync](#growSync)
+  - [shrink](#shrink) / [shrinkSync](#shrinkSync)
+  - [resize](#resize) / [resizeSync](#resizeSync)
+  - [drop](#drop) / [dropSync](#dropSync)
+  - [getProperties](#getproperties) / [setProperties](#setproperties)
 - [Data manipulation methods](#data-manipulation-methods)
-  - [insert](#insert)
-  - [insertSync](#insertSync)
-  - [insertFile](#insertFile)
-  - [insertFileSync](#insertFileSync)
-  - [select](#select)
-  - [selectSync](#selectSync)
-  - [aggregate](#aggregate)
-  - [aggregateSync](#aggregateSync)
-  - [update](#update)
-  - [updateSync](#updateSync)
-  - [delete](#delete)
-  - [deleteSync](#deleteSync)
+  - [insert](#insert) / [insertSync](#insertSync)
+  - [insertFile](#insertFile) / [insertFileSync](#insertFileSync)
+  - [select](#select) / [selectSync](#selectSync)
+  - [aggregate](#aggregate) / [aggregateSync](#aggregateSync)
+  - [update](#update) / [updateSync](#updateSync)
+  - [delete](#delete) / [deleteSync](#deleteSync)
 - [Finding and fixing problematic data](#finding-and-fixing-problematic-data)
 
 ## Install
@@ -156,9 +142,13 @@ Returns statistics about the `Database`. Resolves with the following information
 
 Name|Description
 ----|-----------
-`size`|The total size of the `Database` (the sum of the sizes of the individual `datastores`)
+`root`|The path of the root directory of the `Database`
+`data`|The path of the data subdirectory of the `Database`
+`temp`|The path of the temp subdirectory of the `Database`
+`records`|The number of records in the `Database` (the sum of the number of records in each `datastore`)
+`errors`|The number of problematic records in the `Database`
+`size`|The total size of the `Database` in "human-readable" format (the sum of the sizes of the individual `datastores`)
 `stores`|The total number of `datastores` in the `Database`
-`records`|The total number of records in the `Database` (the sum of the number of records in each `datastore`)
 `min`|The minimum number of records in a `datastore`
 `max`|The maximum number of records in a `datastore`
 `mean`|The mean (i.e., average) number of records in each `datastore`
@@ -232,6 +222,12 @@ A synchronous version of `drop`.
 `getStats()`
 
 DEPRECATED: Currently an alias for `stats`. Will likely be dropped in a future version.
+
+### getStatsSync
+
+`getStatsSync()`
+
+DEPRECATED: Currently an alias for `statsSync`. Will likely be dropped in a future version.
 
 ### getProperties
 
@@ -335,12 +331,12 @@ Name|Type|Description
 `elapsed`|number|The amount of time in milliseconds required to execute the `select`
 `details`|array|An array of selection results, including error details, for each individual `datastore`
 
-Example with projection (selects all records; returns only the `id` and `modified` fields, but also creates a new one called `newID`):
+Example with projection that selects all records, returns only the `id` and `modified` fields, but also creates a new one called `newID`:
 
 ```js
 db.select(
-    function () { return true; },
-    function (record) { return {id: record.id, newID: record.id + 1, modified: record.modified }; }
+    () => true,
+    record => { return {id: record.id, newID: record.id + 1, modified: record.modified }; }
 );
 ```
 
@@ -382,36 +378,36 @@ Each index object contains the following:
 Name|Type|Description
 ----|----|-----------
 `index`|any valid type|The value of the index created by the indexer function
+`count`|number|The count of records that contained the index
 `data`|array|An array of aggregation objects for each field of the records returned
 
-Each aggregation object contains the following:
+Each aggregation object contains one or more of the following (non-numeric fields do not contain numeric aggregate data):
 
-Name|Description
-----|-----------
-`min`|Minimum value of the field
-`max`|Maximum value of the field
-`count`|The count of records that matched the index
-`sum`|The sum of the values of the field (undefined if not a number)
-`mean`| The mean (i.e., average) of the values of the field (undefined if not a number)
-`varp`|The population variance of the values of the field (undefined if not a number)
-`vars`|The sample variance of the values of the field (undefined if not a number)
-`stdp`|The population standard deviation of the values of the field (undefined if not a number)
-`stds`|The sample standard deviation of the values of the field (undefined if not a number)
+Name|Type|Description
+----|----|-----------
+`min`|any valid type|Minimum value of the field
+`max`|any valid type|Maximum value of the field
+`sum`|number|The sum of the values of the field (undefined if not a number)
+`mean`|number|The mean (i.e., average) of the values of the field (undefined if not a number)
+`varp`|number|The population variance of the values of the field (undefined if not a number)
+`vars`|number|The sample variance of the values of the field (undefined if not a number)
+`stdp`|number|The population standard deviation of the values of the field (undefined if not a number)
+`stds`|number|The sample standard deviation of the values of the field (undefined if not a number)
 
-An example (generates aggregates for all records and fields, grouped by state and lastName):
+An example that generates aggregates for all records and fields, grouped by state and lastName:
 ```js
 db.aggregate(
-    function () { return true; },
-    function (record) { return [record.state, record.lastName]; }
+    () => true,
+    record => [record.state, record.lastName]
 );
 ```
 
-Another example (generates aggregates for records with an ID less than 1000, grouped by state, but for only two fields):
+Another example that generates aggregates for records with an ID less than 1000, grouped by state, but for only two fields (note the non-numeric fields do not include numeric aggregate data):
 ```js
 db.aggregate(
-    function (record) { return record.id < 1000; },
-    function (record) { return [record.state]; },
-    function (record) { return {favoriteNumber: record.favoriteNumber, firstName: record.firstName}; }
+    record => record.id < 1000,
+    record => record.state,
+    record => { return {favoriteNumber: record.favoriteNumber, firstName: record.firstName}; }
 );
 ```
 
@@ -420,13 +416,13 @@ Example aggregate data array:
 [
     {
         index: "Maryland",
+        count: 50,
         aggregates: [
             {
                 field: "favoriteNumber",
                 data: {
                       min: 0,
                       max: 98,
-                      count: 50,
                       sum: 2450,
                       mean: 49,
                       varp: 833,
@@ -439,27 +435,20 @@ Example aggregate data array:
                 field: "firstName",
                 data: {
                     min: "Elizabeth",
-                    max: "William",
-                    count: 50,
-                    sum: undefined,
-                    mean: undefined,
-                    varp: undefined,
-                    vars: undefined,
-                    stdp: undefined,
-                    stds: undefined
+                    max: "William"
                 }
             }
         ]
     },
     {
         index: "Virginia",
+        count: 50,
         aggregates: [
             {
                 field: "favoriteNumber",
                 data: {
                     min: 0,
                     max: 49,
-                    count: 50,
                     sum: 1225,
                     mean: 24.5,
                     varp: 208.25000000000003,
@@ -473,13 +462,7 @@ Example aggregate data array:
                 data: {
                     min: "James",
                     max: "Robert",
-                    count: 50,
-                    sum: undefined,
-                    mean: undefined,
-                    varp: undefined,
-                    vars: undefined,
-                    stdp: undefined,
-                    stds: undefined
+                    count: 50
                 }
             }
         ]
