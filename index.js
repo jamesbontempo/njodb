@@ -3,6 +3,7 @@ const path = require("path");
 const njodb = require("./lib/njodb");
 const reduce = require("./lib/reduce");
 const utils = require("./lib/utils");
+const validators = require("./lib/validators");
 
 const defaults = {
     "datadir": "data",
@@ -38,22 +39,25 @@ const saveProperties = (root, properties) => {
 class Database {
 
     constructor(root) {
-        utils.checkValue("root", root, false, "string", function(root) { return root.length > 0; });
+        if (root) validators.validatePath(root);
 
         this.properties = {};
         this.properties.root = (root) ? root : process.cwd();
+
+        if (!fs.existsSync(this.properties.root)) fs.mkdirSync(this.properties.root);
 
         const propertiesFile = path.join(this.properties.root, "njodb.properties");
 
         if (fs.existsSync(propertiesFile)) {
             this.setProperties(JSON.parse(fs.readFileSync(propertiesFile)));
         } else {
-            if (!fs.existsSync(this.properties.root)) fs.mkdirSync(this.properties.root);
             this.setProperties(defaults);
         }
 
         if (!fs.existsSync(this.properties.datapath)) fs.mkdirSync(this.properties.datapath);
         if (!fs.existsSync(this.properties.temppath)) fs.mkdirSync(this.properties.temppath);
+
+        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
         return this;
     }
@@ -65,7 +69,7 @@ class Database {
     }
 
     setProperties(properties) {
-        utils.checkValue("properties", properties, true, "object");
+        validators.validateObject(properties);
 
         this.properties.datadir = (properties.datadir && typeof properties.datadir === "string") ? properties.datadir : defaults.datadir;
         this.properties.dataname = (properties.dataname && typeof properties.dataname === "string") ? properties.dataname : defaults.dataname;
@@ -89,22 +93,14 @@ class Database {
 
         var promises = [];
 
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
-
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
-
-            promises.push(
-                njodb.statsStoreData(
-                    storepath,
-                    this.properties.lockoptions
-                )
-            );
+            promises.push(njodb.statsStoreData(storepath, this.properties.lockoptions));
         }
 
         const results = await Promise.all(promises);
 
-        return Object.assign(stats, reduce.getStatsReduce(results));
+        return Object.assign(stats, reduce.statsReduce(results));
     }
 
     statsSync() {
@@ -116,14 +112,12 @@ class Database {
 
         var results = [];
 
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
-
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
             results.push(njodb.statsStoreDataSync(storepath));
         }
 
-        return Object.assign(stats, reduce.getStatsReduce(results));
+        return Object.assign(stats, reduce.statsReduce(results));
     }
 
     async getStats() {
@@ -136,152 +130,76 @@ class Database {
 
     async grow() {
         this.properties.datastores++;
+        const results = await njodb.distributeStoreData(this.properties);
+        this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
-
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
-
-        const results = await njodb.distributeStoreData(
-            this.properties.datapath,
-            this.properties.dataname,
-            storenames,
-            this.properties.temppath,
-            this.properties.datastores,
-            this.properties.lockoptions
-        );
-
         return results;
     }
 
     growSync() {
         this.properties.datastores++;
+        const results = njodb.distributeStoreDataSync(this.properties);
+        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
-
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
-
-        const results = njodb.distributeStoreDataSync(
-            this.properties.datapath,
-            this.properties.dataname,
-            storenames,
-            this.properties.temppath,
-            this.properties.datastores
-        );
-
         return results;
     }
 
     async shrink() {
         if (this.properties.datastores > 1) {
             this.properties.datastores--;
+            const results = await njodb.distributeStoreData(this.properties);
+            this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
             saveProperties(this.properties.root, this.properties);
-
-            const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
-
-            const results = await njodb.distributeStoreData(
-                this.properties.datapath,
-                this.properties.dataname,
-                storenames,
-                this.properties.temppath,
-                this.properties.datastores,
-                this.properties.lockoptions
-            );
-
             return results;
         } else {
-            throw new Error("database cannot shrink any further");
+            throw new Error("Database cannot shrink any further");
         }
     }
 
     shrinkSync() {
         if (this.properties.datastores > 1) {
             this.properties.datastores--;
+            const results = njodb.distributeStoreDataSync(this.properties);
+            this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
             saveProperties(this.properties.root, this.properties);
-
-            const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
-
-            const results = njodb.distributeStoreDataSync(
-                this.properties.datapath,
-                this.properties.dataname,
-                storenames,
-                this.properties.temppath,
-                this.properties.datastores
-            );
-
             return results;
         } else {
-            throw new Error("database cannot shrink any further");
+            throw new Error("Database cannot shrink any further");
         }
     }
 
     async resize(size) {
-        utils.checkValue("size", size, false, "number", function(size) { return size > 0; });
-
+        validators.validateSize(size);
         this.properties.datastores = size;
+        const results = await njodb.distributeStoreData(this.properties);
+        this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
-
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
-
-        const results = await njodb.distributeStoreData(
-            this.properties.datapath,
-            this.properties.dataname,
-            storenames,
-            this.properties.temppath,
-            size,
-            this.properties.lockoptions
-        );
-
         return results;
     }
 
     resizeSync(size) {
-        utils.checkValue("size", size, false, "number", function(size) { return size > 0; });
-
+        validators.validateSize(size);
         this.properties.datastores = size;
+        const results = njodb.distributeStoreDataSync(this.properties);
+        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
-
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
-
-        const results = njodb.distributeStoreDataSync(
-            this.properties.datapath,
-            this.properties.dataname,
-            storenames,
-            this.properties.temppath,
-            size
-        );
-
         return results;
     }
 
     async drop() {
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
-
-        const results = await njodb.dropEverything(
-            this.properties.root,
-            this.properties.datapath,
-            storenames,
-            this.properties.temppath,
-            this.properties.lockoptions
-        );
-
+        const results = await njodb.dropEverything(this.properties);
         return reduce.dropReduce(results);
     }
 
     dropSync() {
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
-
-        const results = njodb.dropEverythingSync(
-            this.properties.root,
-            this.properties.datapath,
-            storenames,
-            this.properties.temppath
-        );
-
+        const results = njodb.dropEverythingSync(this.properties);
         return reduce.dropReduce(results);
     }
 
     // Data manipulation methods
 
     async insert(data) {
-        utils.checkValue("data", data, true, "array", function(data) { return data.length > 0; });
+        validators.validateArray(data);
 
         var promises = [];
         var records = [];
@@ -308,11 +226,14 @@ class Database {
         }
 
         const results = await Promise.all(promises);
+
+        this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+
         return reduce.insertReduce(results);
     }
 
     insertSync(data) {
-        utils.checkValue("data", data, true, "array", data => data.length > 0);
+        validators.validateArray(data);
 
         var results = [];
         var records = [];
@@ -338,18 +259,18 @@ class Database {
             );
         }
 
+        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+
         return reduce.insertReduce(results);
     }
 
     async insertFile(file) {
-        utils.checkValue("file", file, true, "string", function(file) { return fs.existsSync(file); });
-
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+        validators.validatePath(file);
 
         const results = await njodb.insertFileData(
             file,
             this.properties.datapath,
-            storenames,
+            this.properties.storenames,
             this.properties.lockoptions
         );
 
@@ -357,7 +278,7 @@ class Database {
     }
 
     insertFileSync(file) {
-        utils.checkValue("file", file, true, "string", function(file) { return fs.existsSync(file); });
+        validators.validatePath(file);
 
         const data = fs.readFileSync(file, "utf8").split("\n");
 
@@ -373,13 +294,12 @@ class Database {
     }
 
     async select(selecter, projecter) {
-        utils.checkValue("selecter", selecter, true, "function");
-        utils.checkValue("projecter", projecter, false, "function");
+        validators.validateFunction(selecter);
+        if (projecter) validators.validateFunction(projecter);
 
         var promises = [];
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
 
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
             promises.push(
                 njodb.selectStoreData(
@@ -396,13 +316,12 @@ class Database {
     }
 
     selectSync(selecter, projecter) {
-        utils.checkValue("selecter", selecter, true, "function");
-        utils.checkValue("projecter", projecter, false, "function");
+        validators.validateFunction(selecter);
+        if (projecter) validators.validateFunction(projecter);
 
         var results = [];
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
             results.push(
                 njodb.selectStoreDataSync(
@@ -416,70 +335,13 @@ class Database {
         return reduce.selectReduce(results);
     }
 
-    async aggregate(selecter, indexer, projecter) {
-        utils.checkValue("selecter", selecter, true, "function");
-        utils.checkValue("indexer", indexer, true, "function");
-        utils.checkValue("projecter", projecter, false, "function");
-
-        var promises = [];
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
-
-        for (const storename of storenames) {
-            const storepath = path.join(this.properties.datapath, storename);
-
-            promises.push(
-                njodb.aggregateStoreData(
-                    storepath,
-                    selecter,
-                    indexer,
-                    projecter,
-                    this.properties.lockoptions
-                )
-            );
-        }
-
-        const results = await Promise.all(promises);
-        return reduce.aggregateReduce(results);
-    }
-
-    aggregateSync(selecter, indexer, projecter) {
-        utils.checkValue("selecter", selecter, true, "function");
-        utils.checkValue("indexer", indexer, true, "function");
-
-        utils.checkValue(
-            "projecter",
-            projecter,
-            false,
-            "function"
-        );
-
-        var results = [];
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
-
-        for (const storename of storenames) {
-            const storepath = path.join(this.properties.datapath, storename);
-
-            results.push(
-                njodb.aggregateStoreDataSync(
-                    storepath,
-                    selecter,
-                    indexer,
-                    projecter
-                )
-            );
-        }
-
-        return reduce.aggregateReduce(results);
-    }
-
     async update(selecter, updater) {
-        utils.checkValue("selecter", selecter, true, "function");
-        utils.checkValue("updater", updater, true, "function");
+        validators.validateFunction(selecter);
+        validators.validateFunction(updater);
 
         var promises = [];
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
 
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
             const tempstorename = [storename, Date.now(), "tmp"].join(".");
             const tempstorepath = path.join(this.properties.temppath, tempstorename);
@@ -500,13 +362,12 @@ class Database {
     }
 
     updateSync(selecter, updater) {
-        utils.checkValue("selecter", selecter, true, "function");
-        utils.checkValue("updater", updater, true, "function");
+        validators.validateFunction(selecter);
+        validators.validateFunction(updater);
 
         var results = [];
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
             const tempstorename = [storename, Date.now(), "tmp"].join(".");
             const tempstorepath = path.join(this.properties.temppath, tempstorename);
@@ -525,12 +386,11 @@ class Database {
     }
 
     async delete(selecter) {
-        utils.checkValue("selecter", selecter, true, "function");
+        validators.validateFunction(selecter);
 
         var promises = [];
-        const storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
 
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
             const tempstorename = [storename, Date.now(), "tmp"].join(".");
             const tempstorepath = path.join(this.properties.temppath, tempstorename);
@@ -550,12 +410,11 @@ class Database {
     }
 
     deleteSync(selecter) {
-        utils.checkValue("selecter", selecter, true, "function");
+        validators.validateFunction(selecter);
 
         var results = [];
-        const storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
-        for (const storename of storenames) {
+        for (const storename of this.properties.storenames) {
             const storepath = path.join(this.properties.datapath, storename);
             const tempstorename = [storename, Date.now(), "tmp"].join(".");
             const tempstorepath = path.join(this.properties.temppath, tempstorename);
@@ -570,6 +429,54 @@ class Database {
         }
 
         return reduce.deleteReduce(results);
+    }
+
+    async aggregate(selecter, indexer, projecter) {
+        validators.validateFunction(selecter);
+        validators.validateFunction(indexer);
+        if (projecter) validators.validateFunction(projecter);
+
+        var promises = [];
+
+        for (const storename of this.properties.storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+
+            promises.push(
+                njodb.aggregateStoreData(
+                    storepath,
+                    selecter,
+                    indexer,
+                    projecter,
+                    this.properties.lockoptions
+                )
+            );
+        }
+
+        const results = await Promise.all(promises);
+        return reduce.aggregateReduce(results);
+    }
+
+    aggregateSync(selecter, indexer, projecter) {
+        validators.validateFunction(selecter);
+        validators.validateFunction(indexer);
+        if (projecter) validators.validateFunction(projecter);
+
+        var results = [];
+
+        for (const storename of this.properties.storenames) {
+            const storepath = path.join(this.properties.datapath, storename);
+
+            results.push(
+                njodb.aggregateStoreDataSync(
+                    storepath,
+                    selecter,
+                    indexer,
+                    projecter
+                )
+            );
+        }
+
+        return reduce.aggregateReduce(results);
     }
 }
 

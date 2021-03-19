@@ -20,6 +20,7 @@ const defaults = {
         }
     },
     "root": __dirname,
+    "storenames": [],
     "tempdir": "tmp",
     "temppath": path.join(__dirname, "tmp")
 };
@@ -572,18 +573,6 @@ describe("NJODB error tests", () => {
         expect(error).to.be.an("Error");
     });
 
-    it("Tries to insert an empty data array", () => {
-        let error = null;
-
-        try {
-            db.insertSync([]);
-        } catch(e) {
-            error = e;
-        }
-
-        expect(error).to.be.an("Error");
-    });
-
     it("Tries to select records without providing a selecter function", () => {
         let error = null;
 
@@ -697,7 +686,7 @@ describe("NJODB error tests", () => {
         const results = db.deleteSync(function(record) { return record.firstName === "James"; });
         expect(results.errors).to.equal(1);
     });
-    
+
     it("Deletes data asynchronously and finds bad record", async () => {
         return db.delete(function(record) { return record.lastName === "Williams"; }).then(results => {
             expect(results.errors).to.equal(1);
