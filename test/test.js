@@ -255,13 +255,7 @@ describe("NJODB async tests", () => {
         return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; })
             .then(results => {
                 expect(results.updated).to.equal(updates.length);
-                expect(results.unchanged).to.equal(inserts.length - updates.length);})
-            .then(() => {
-                db.select(function(record) { return record.lastName === "Smythe"; }).then(results => {
-                    expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(updates);
-                    expect(results.selected).to.equal(updates.length);
-                    expect(results.ignored).to.equal(inserts.length - updates.length);
-                });
+                expect(results.unchanged).to.equal(inserts.length - updates.length);
             });
     });
 
@@ -294,7 +288,7 @@ describe("NJODB async tests", () => {
     });
 
     it("Gets statistics about the database asynchronously", async () => {
-        return db.getStats().then(results => {
+        return db.stats().then(results => {
             expect(results.stores).to.equal(2);
             expect(results.records).to.equal(inserts.length - deletes.length);
         })
@@ -500,7 +494,7 @@ describe("NJODB sync tests", () => {
     });
 
     it("Gets statistics about the database synchronously", () => {
-        const results = db.getStatsSync();
+        const results = db.statsSync();
         expect(results.stores).to.equal(1);
         expect(results.records).to.equal(inserts.length - deletes.length + 50);
     });
@@ -517,12 +511,21 @@ describe("NJODB sync tests", () => {
 
 describe("NJODB error tests", () => {
 
-    it("Creates a new NJODB instance with bad properties", () => {
-        db = new njodb.Database(__dirname);
-        db.setProperties(badProperties);
-        expect(db.getProperties()).to.deep.equal(defaults);
-        expect(fs.existsSync(path.join(defaults.root, "data"))).to.equal(true);
-        expect(fs.existsSync(path.join(defaults.root, "tmp"))).to.equal(true);
+    it("Tries to set bad properties", () => {
+        let error = null;
+
+        try {
+            db = new njodb.Database(__dirname);
+            db.setProperties(badProperties);
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+
+        var properties = {};
+        Object.keys(db.getProperties()).sort().forEach(p => properties[p] = db.properties[p]);
+        expect(properties).to.deep.equal(defaults);
     });
 
     it("Inserts data synchronously", () => {
@@ -539,14 +542,14 @@ describe("NJODB error tests", () => {
     });
 
     it("Gets database stats asynchronously and finds bad record", async () => {
-        return db.getStats().then(results => {
+        return db.stats().then(results => {
             expect(results.records).to.equal(inserts.length * 2);
             expect(results.errors).to.equal(1);
         });
     })
 
     it("Gets database stats synchronously and finds bad record", () => {
-        const results = db.getStatsSync();
+        const results = db.statsSync();
         expect(results.errors).to.equal(1);
     })
 

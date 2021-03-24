@@ -1,5 +1,8 @@
+"use strict";
+
 const fs = require("fs");
 const path = require("path");
+
 const njodb = require("./lib/njodb");
 const reduce = require("./lib/reduce");
 const utils = require("./lib/utils");
@@ -49,7 +52,11 @@ class Database {
         const propertiesFile = path.join(this.properties.root, "njodb.properties");
 
         if (fs.existsSync(propertiesFile)) {
-            this.setProperties(JSON.parse(fs.readFileSync(propertiesFile)));
+            try {
+                this.setProperties(JSON.parse(fs.readFileSync(propertiesFile)));
+            } catch {
+                this.setProperties(defaults);
+            }
         } else {
             this.setProperties(defaults);
         }
@@ -71,11 +78,11 @@ class Database {
     setProperties(properties) {
         validators.validateObject(properties);
 
-        this.properties.datadir = (properties.datadir && typeof properties.datadir === "string") ? properties.datadir : defaults.datadir;
-        this.properties.dataname = (properties.dataname && typeof properties.dataname === "string") ? properties.dataname : defaults.dataname;
-        this.properties.datastores = (properties.datastores && typeof properties.datastores === "number") ? properties.datastores : defaults.datastores;
-        this.properties.tempdir = (properties.tempdir && typeof properties.tempdir === "string") ? properties.tempdir : defaults.tempdir;
-        this.properties.lockoptions = (properties.lockoptions && typeof properties.lockoptions === "object") ? properties.lockoptions : defaults.lockoptions;
+        this.properties.datadir = (validators.validateName(properties.datadir)) ? properties.datadir : defaults.datadir;
+        this.properties.dataname = (validators.validateName(properties.dataname)) ? properties.dataname : defaults.dataname;
+        this.properties.datastores = (validators.validateSize(properties.datastores)) ? properties.datastores : defaults.datastores;
+        this.properties.tempdir = (validators.validateName(properties.tempdir)) ? properties.tempdir : defaults.tempdir;
+        this.properties.lockoptions = (validators.validateObject(properties.lockoptions)) ? properties.lockoptions : defaults.lockoptions;
         this.properties.datapath = path.join(this.properties.root, this.properties.datadir);
         this.properties.temppath = path.join(this.properties.root, this.properties.tempdir);
 
@@ -118,14 +125,6 @@ class Database {
         }
 
         return Object.assign(stats, reduce.statsReduce(results));
-    }
-
-    async getStats() {
-        return this.stats();
-    }
-
-    getStatsSync() {
-        return this.statsSync();
     }
 
     async grow() {

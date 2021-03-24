@@ -217,18 +217,6 @@ Deletes the database, including the data and temp directories, and the propertie
 
 A synchronous version of `drop`.
 
-### getStats
-
-`getStats()`
-
-DEPRECATED: Currently an alias for `stats`. Will likely be dropped in a future version.
-
-### getStatsSync
-
-`getStatsSync()`
-
-DEPRECATED: Currently an alias for `statsSync`. Will likely be dropped in a future version.
-
 ### getProperties
 
 `getProperties()`
