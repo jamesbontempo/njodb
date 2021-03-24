@@ -59,7 +59,6 @@ const regions = ["Northeast", "Southeast", "Midwest", "Southwest", "West"];
 var inserts = [];
 var selects = [];
 var selectsProjection = [];
-var regionCount = 0;
 var updates = [];
 var deletes = [];
 
@@ -96,7 +95,6 @@ for (var i = 0; i < 50; i++) {
 
     if (Math.random() < 0.5) {
         data.region = regions[Math.floor(Math.random()*regions.length)];
-        regionCount++;
     }
 
     inserts.push(data);
