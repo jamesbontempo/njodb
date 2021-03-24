@@ -2,7 +2,7 @@
 
 `njodb` is a persistent, partitioned, concurrency-controlled, Node.js JSON object database. Data is written to the file system and distributed across multiple files that are protected by read and write locks. By default, all methods are asynchronous and use read/write streams to improve performance and reduce memory requirements (this should be particularly useful for large databases).
 
-For a simple command-line interface to `njodb` check out [njodb-cli](#https://www.npmjs.com/package/njodb-cli)
+For a simple command-line interface to `njodb` check out [njodb-cli](https://www.npmjs.com/package/njodb-cli)
 
 ## Table of contents
 - [Install](#install)
