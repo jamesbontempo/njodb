@@ -64,7 +64,7 @@ class Database {
         if (!fs.existsSync(this.properties.datapath)) fs.mkdirSync(this.properties.datapath);
         if (!fs.existsSync(this.properties.temppath)) fs.mkdirSync(this.properties.temppath);
 
-        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+        this.properties.storenames = utils.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
         return this;
     }
@@ -130,7 +130,7 @@ class Database {
     async grow() {
         this.properties.datastores++;
         const results = await njodb.distributeStoreData(this.properties);
-        this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+        this.properties.storenames = await utils.getStoreNames(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
         return results;
     }
@@ -138,7 +138,7 @@ class Database {
     growSync() {
         this.properties.datastores++;
         const results = njodb.distributeStoreDataSync(this.properties);
-        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+        this.properties.storenames = utils.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
         return results;
     }
@@ -147,7 +147,7 @@ class Database {
         if (this.properties.datastores > 1) {
             this.properties.datastores--;
             const results = await njodb.distributeStoreData(this.properties);
-            this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+            this.properties.storenames = await utils.getStoreNames(this.properties.datapath, this.properties.dataname);
             saveProperties(this.properties.root, this.properties);
             return results;
         } else {
@@ -159,7 +159,7 @@ class Database {
         if (this.properties.datastores > 1) {
             this.properties.datastores--;
             const results = njodb.distributeStoreDataSync(this.properties);
-            this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+            this.properties.storenames = utils.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
             saveProperties(this.properties.root, this.properties);
             return results;
         } else {
@@ -171,7 +171,7 @@ class Database {
         validators.validateSize(size);
         this.properties.datastores = size;
         const results = await njodb.distributeStoreData(this.properties);
-        this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+        this.properties.storenames = await utils.getStoreNames(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
         return results;
     }
@@ -180,7 +180,7 @@ class Database {
         validators.validateSize(size);
         this.properties.datastores = size;
         const results = njodb.distributeStoreDataSync(this.properties);
-        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+        this.properties.storenames = utils.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
         saveProperties(this.properties.root, this.properties);
         return results;
     }
@@ -208,10 +208,10 @@ class Database {
             records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
         }
 
-        var stores = Array.from(Array(this.properties.datastores).keys());
+        const randomizer = utils.Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
 
         for (var j = 0; j < records.length; j++) {
-            const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
+            const storenumber = randomizer.next();
             const storename = [this.properties.dataname, storenumber, "json"].join(".");
             const storepath = path.join(this.properties.datapath, storename)
 
@@ -226,7 +226,7 @@ class Database {
 
         const results = await Promise.all(promises);
 
-        this.properties.storenames = await njodb.getStoreNames(this.properties.datapath, this.properties.dataname);
+        this.properties.storenames = await utils.getStoreNames(this.properties.datapath, this.properties.dataname);
 
         return reduce.insertReduce(results);
     }
@@ -242,10 +242,10 @@ class Database {
             records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
         }
 
-        var stores = Array.from(Array(this.properties.datastores).keys());
+        const randomizer = utils.Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
 
         for (var j = 0; j < records.length; j++) {
-            const storenumber = stores.splice(Math.floor(Math.random()*stores.length), 1)[0];
+            const storenumber = randomizer.next();
             const storename = [this.properties.dataname, storenumber, "json"].join(".");
             const storepath = path.join(this.properties.datapath, storename)
 
@@ -258,7 +258,7 @@ class Database {
             );
         }
 
-        this.properties.storenames = njodb.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
+        this.properties.storenames = utils.getStoreNamesSync(this.properties.datapath, this.properties.dataname);
 
         return reduce.insertReduce(results);
     }
@@ -281,13 +281,32 @@ class Database {
 
         const data = fs.readFileSync(file, "utf8").split("\n");
 
-        const checked = utils.checkData(data);
+        var results = {
+            lines: 0,
+            inserted: 0,
+            data: [],
+            errors: [],
+            blanks: 0
+        }
 
-        const results = this.insertSync(checked.data);
+        for (var record of data) {
+            record = record.trim()
+            
+            results.lines++;
 
-        results.inspected = checked.inspected;
-        results.errors = checked.errors;
-        results.blanks = checked.blanks;
+            if (record.length > 0) {
+                try {
+                    results.data.push(JSON.parse(record));
+                } catch(error) {
+                    results.errors.push({error: error.message, line: results.lines, data: record});
+                }
+            } else {
+                results.blanks++;
+            }
+        }
+
+        results = Object.assign(results, this.insertSync(results.data));
+        delete results.data;
 
         return results;
     }

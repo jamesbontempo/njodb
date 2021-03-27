@@ -528,24 +528,26 @@ A synchronous version of `delete`.
 
 Many methods return information about problematic records encountered (i.e., records that are not parseable using `JSON.parse()`); both a count of them, as well as details about them in the `details` array. The objects in the `details` array - one for each `datastore` - contain an `errors` array that is a collection of objects about problematic records in the `datastore`. Each error object includes the line of the `datastore` file where the problematic record was found as well as a copy of the record itself. With this information, if one wants to address these problematic data they can simply load the `datastore` file in a text editor and either correct the record or remove it.
 
-Here is an example of the `details` for a `datastore` that contains a problematic record. As you can see, the record is on the first line of the file, and the problem is that the `lastname` key name is missing an enclosing quote. Simply adding the quote fixes the record.
+Here is an example of the `details` for a `datastore` that contains a problematic record. As you can see, the record is on the tenth line of the file, and the problem is that the `lastname` key name is missing an enclosing quote. Simply adding the quote fixes the record.
 
 ```js
 {
-    store: '/Users/jamesbontempo/github/njodb/data/data.0.json',
-    size: 13362190,
-    records: 90157,
-    errors: [
-      {
-        line: 1,
-        data: {
-          error: '{"id":100,"firstName":"Patricia","lastName:"Brown","state":"California","birthdate":"1980-02-08","favoriteNumbers":[3,3,627],"favoriteNumber":356,"modified":1615242040534}'
-        }
-      }
-    ],
-    created: 2021-03-09T01:27:36.431Z,
-    modified: 2021-03-09T15:22:22.372Z,
-    start: 1615303347030,
-    end: 1615303347299
-  }
+  store: '/Users/jamesbontempo/github/njodb/data/data.0.json',
+  size: 1512464,
+  lines: 8711,
+  records: 8709,
+  errors: [
+    {
+      error: 'Unexpected token D in JSON at position 42',
+      line: 10,
+      data: '{"id":232,"firstName":"Robert","lastName:"Davis","state":"Illinois","birthdate":"1990-10-22","favoriteNumbers":[5,34,1],"favoriteNumber":183,"modified":1616806973645}'
+    }
+  ],
+  blanks: 1,
+  created: 2021-03-27T01:20:21.562Z,
+  modified: 2021-03-27T01:28:32.686Z,
+  start: 1616808517081,
+  end: 1616808517124,
+  elapsed: 43
+}
  ```

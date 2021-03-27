@@ -296,6 +296,7 @@ describe("NJODB async tests", () => {
         return db.insertFile(path.join(__dirname, "data.json")).then(results => {
             expect(results.inserted).to.equal(50);
             expect(results.errors.length).to.equal(1);
+            expect(results.blanks).to.equal(3);
         });
     });
 
@@ -489,6 +490,7 @@ describe("NJODB sync tests", () => {
         const results = db.insertFileSync(path.join(__dirname, "data.json"));
         expect(results.inserted).to.equal(50);
         expect(results.errors.length).to.equal(1);
+        expect(results.blanks).to.equal(4);
     });
 
     it("Gets statistics about the database synchronously", () => {
