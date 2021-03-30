@@ -5,6 +5,7 @@ const path = require("path");
 
 const njodb = require("./lib/njodb");
 const reduce = require("./lib/reduce");
+const objects = require("./lib/objects");
 const utils = require("./lib/utils");
 const validators = require("./lib/validators");
 
@@ -42,21 +43,21 @@ const saveProperties = (root, properties) => {
 class Database {
 
     constructor(root) {
-        if (root) validators.validatePath(root);
-
         this.properties = {};
-        this.properties.root = (root) ? root : process.cwd();
+
+        if (root !== undefined && root !== null) {
+            validators.validateName(root);
+            this.properties.root = root;
+        } else {
+            this.properties.root = process.cwd();
+        }
 
         if (!fs.existsSync(this.properties.root)) fs.mkdirSync(this.properties.root);
 
         const propertiesFile = path.join(this.properties.root, "njodb.properties");
 
         if (fs.existsSync(propertiesFile)) {
-            try {
-                this.setProperties(JSON.parse(fs.readFileSync(propertiesFile)));
-            } catch {
-                this.setProperties(defaults);
-            }
+            this.setProperties(JSON.parse(fs.readFileSync(propertiesFile)));
         } else {
             this.setProperties(defaults);
         }
@@ -208,7 +209,7 @@ class Database {
             records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
         }
 
-        const randomizer = utils.Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
+        const randomizer = objects.Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
 
         for (var j = 0; j < records.length; j++) {
             const storenumber = randomizer.next();
@@ -242,7 +243,7 @@ class Database {
             records[i % this.properties.datastores] += JSON.stringify(data[i]) + "\n";
         }
 
-        const randomizer = utils.Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
+        const randomizer = objects.Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
 
         for (var j = 0; j < records.length; j++) {
             const storenumber = randomizer.next();
@@ -291,7 +292,7 @@ class Database {
 
         for (var record of data) {
             record = record.trim()
-            
+
             results.lines++;
 
             if (record.length > 0) {

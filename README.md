@@ -1,8 +1,22 @@
 # njodb
 
-`njodb` is a persistent, partitioned, concurrency-controlled, Node.js JSON object database. Data is written to the file system and distributed across multiple files that are protected by read and write locks. By default, all methods are asynchronous and use read/write streams to improve performance and reduce memory requirements (this should be particularly useful for large databases).
+`njodb` is a persistent, partitioned, concurrency-controlled, Node JSON object database. Data is written to the file system and distributed across multiple files that are protected by read and write locks. By default, all methods are asynchronous and use read/write streams to improve performance and reduce memory requirements (this should be particularly useful for large databases).
 
-For a simple command-line interface to `njodb` check out [njodb-cli](https://www.npmjs.com/package/njodb-cli)
+## What makes `njodb` different than other Node JSON object databases?
+
+**Persistence** - Data is saved to the file system so that it remains after the application that created it is no longer running, unlike many of the existing in-memory solutions. This persistence also allows data to be made available to other applications.
+
+**Asynchronous and streaming** - By default, all methods are asynchronous and non-blocking, and also use read and write streams, to make data access and manipulation efficient. Synchronous methods are also provided for those cases where they are desired or  appropriate.
+
+**JSON records, not JSON files** - Records are stored as individual lines of JSON objects in a file, so a read stream can be used to retrieve data rapidly, parse it in small chunks, and dispense with it when done. This removes the time and memory overhead required by solutions that store data as a single, monolithic JSON object. They must read all of that data into memory, and then parse all of it, before allowing you to using any of it.
+
+**Completely schemaless** - While the JSON data itself is schemaless, it is also the case that data is not siloed into tables, or forced into collections, so the entire database, from top to bottom, is schemaless, not just the data. For a user or application, this means that there is no need to know anything about the database structure, only what data is being sought.
+
+**Balanced partitions** - When inserting data, records are randomly distributed across partitions so that partition sizes are kept roughly equal, making data access times consistent. Manually resizing the database performs a similar distribution, so, as the database grows or shrinks, the partitions remain well-balanced.
+
+**Concurrency-controlled** - File locks are used during read and write operations, ensuring data integrity can be maintained in a multi-user/multi-application environment. There are few, if any, existing solutions that are designed for such scenarios and that include this sort of data protection.
+
+`njodb` even has its own command-line interface: check out [njodb-cli](https://www.npmjs.com/package/njodb-cli).
 
 ## Table of contents
 - [Install](#install)

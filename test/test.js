@@ -43,13 +43,7 @@ const properties = {
     "tempdir": "tmp"
 };
 
-const badProperties = {
-    "datadir": 4,
-    "dataname": 2,
-    "datastores": "five",
-    "lockoptions": true,
-    "tempdir": null
-};
+const badJSON = "{\"datadir: \"data\",\"dataname\": \"data\",\"datastores\": 5,\"tempdir\": \"tmp\"}";
 
 const firstNames = ["James", "John", "Robert", "Michael", "William", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth"];
 const lastNames = ["Smith", "Johsnon", "Williams", "Jones", "Brown", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
@@ -132,6 +126,13 @@ var db;
 describe("NJODB async tests", () => {
 
     it("Creates a new NJODB instance", () => {
+        const properties = Object.assign({}, defaults);
+        delete properties.root;
+        delete properties.datapath;
+        delete properties.temppath;
+
+        fs.writeFileSync(path.join(__dirname, "njodb.properties"), JSON.stringify(properties), "utf8");
+
         db = new njodb.Database(__dirname);
         expect(db.getProperties()).to.deep.equal(defaults);
         expect(fs.existsSync(path.join(defaults.root, "njodb.properties"))).to.equal(true);
@@ -145,7 +146,13 @@ describe("NJODB async tests", () => {
         });
     });
 
-    it("Selects data asynchronously", async () => {
+    it("Selects inserted data asynchronously", async () => {
+        return db.select(()=>true).then(results => {
+            expect(results.selected).to.equal(inserts.length);
+        });
+    });
+
+    it("Selects some data asynchronously", async () => {
         return db.select(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; }).then(results => {
             expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selects);
             expect(results.selected).to.equal(selects.length);
@@ -153,7 +160,7 @@ describe("NJODB async tests", () => {
         });
     });
 
-    it("Selects data with projection asynchronously", async () => {
+    it("Selects some data with projection asynchronously", async () => {
         return db.select(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; }, function(record) { return {id: record.id, fullName: record.firstName + " " + record.lastName, newFavoriteNumber: record.favoriteNumber * 5}; }).then(results => {
             expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selectsProjection);
             expect(results.selected).to.equal(selectsProjection.length);
@@ -161,7 +168,7 @@ describe("NJODB async tests", () => {
         });
     });
 
-    it("Aggregates data asynchronously", async () => {
+    it("Aggregates all data asynchronously", async () => {
         return db.aggregate(() => true, () => true).then(results => {
             expect(results.data[0].aggregates.length).to.equal(6);
             expect(results.data[0].count).to.equal(50);
@@ -224,7 +231,7 @@ describe("NJODB async tests", () => {
         });
     });
 
-    it("Aggregates data with projection asynchronously", async () => {
+    it("Aggregates all data with projection asynchronously", async () => {
         return db.aggregate(() => true, () => true, record => { return {id2: record.id * 2}; }).then(results => {
             expect(results.data[0].count).to.equal(50);
             const aggregates = results.data[0].aggregates;
@@ -241,7 +248,7 @@ describe("NJODB async tests", () => {
         });
     });
 
-    it("Aggregrates data asynchronously and skips some", async () => {
+    it("Aggregrates some data asynchronously", async () => {
         return db.aggregate(function() { return true; }, function(record) { return record.region; }).then(results => {
             const indexed = inserts.filter(record => record.region !== undefined).length;
             expect(results.indexed).to.equal(indexed);
@@ -249,7 +256,7 @@ describe("NJODB async tests", () => {
         });
     });
 
-    it("Updates data asynchronously", async () => {
+    it("Updates some data asynchronously", async () => {
         return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; })
             .then(results => {
                 expect(results.updated).to.equal(updates.length);
@@ -257,12 +264,25 @@ describe("NJODB async tests", () => {
             });
     });
 
+    it("Selects updated data asynchronously", async () => {
+        return db.select(r => r.lastName==="Smythe").then(results => {
+            expect(results.selected).to.equal(updates.length);
+        });
+    });
+
     it("Deletes data asynchronously", async () => {
         return db.delete(function(record) { return record.id % 5 === 0; }).then(results => {
             expect(results.deleted).to.equal(deletes.length);
             expect(results.retained).to.equal(inserts.length - deletes.length);
         });
-    })
+    });
+
+    it("Selects deleted data asynchronously", async () => {
+        return db.select(r => r.id%5===0).then(results => {
+            expect(results.selected).to.equal(0);
+            expect(results.ignored).to.equal(inserts.length - deletes.length);
+        });
+    });
 
     it("Grows database asynchronously", async () => {
         return db.grow().then(results => {
@@ -330,21 +350,26 @@ describe("NJODB sync tests", () => {
         expect(results.inserted).to.equal(inserts.length);
     });
 
-    it("Selects data synchronously", () => {
+    it("Selects inserted data synchronously", async () => {
+        const results = db.selectSync(()=>true);
+        expect(results.selected).to.equal(inserts.length);
+    });
+
+    it("Selects some data synchronously", () => {
         const results = db.selectSync(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; });
         expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selects);
         expect(results.selected).to.equal(selects.length);
         expect(results.ignored).to.equal(inserts.length - selects.length);
     });
 
-    it("Select data with projection synchronously", () => {
+    it("Select some data with projection synchronously", () => {
         const results = db.selectSync(function(record) { return record.firstName === "James" && record.lastName !== "Smith"; }, function(record) { return {id: record.id, fullName: record.firstName + " " + record.lastName, newFavoriteNumber: record.favoriteNumber * 5}; });
         expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(selectsProjection);
         expect(results.selected).to.equal(selectsProjection.length);
         expect(results.ignored).to.equal(inserts.length - selectsProjection.length);
     });
 
-    it("Aggregates data synchronously", async () => {
+    it("Aggregates all data synchronously", async () => {
         const results = db.aggregateSync(() => true, () => true);
         expect(results.data[0].count).to.equal(50);
         expect(results.data[0].aggregates.length).to.equal(6);
@@ -406,7 +431,7 @@ describe("NJODB sync tests", () => {
         }
     });
 
-    it("Aggregates filtered data with projection synchronously", async () => {
+    it("Aggregates some data with projection synchronously", async () => {
         const results = db.aggregateSync(() => true, record => record.state, record => { return {id2: record.id * 2}; });
 
         expect(results.data.length).to.equal(states.length);
@@ -442,21 +467,23 @@ describe("NJODB sync tests", () => {
         expect(Math.abs(aggregates.data.stds - Math.sqrt(vars)) < 0.00000000001).to.equal(true);
     });
 
-    it("Aggregrates data synchronously and skips some", () => {
+    it("Aggregrates some data synchronously", () => {
         const results = db.aggregateSync(function() { return true; }, function(record) { return record.region; });
         const indexed = inserts.filter(record => record.region !== undefined).length;
         expect(results.indexed).to.equal(indexed);
         expect(results.unindexed).to.equal(inserts.length - indexed);
     });
 
-    it("Updates data synchronously", () => {
+    it("Updates some data synchronously", () => {
         var results;
 
         results = db.updateSync(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; });
         expect(results.updated).to.equal(updates.length);
         expect(results.unchanged).to.equal(inserts.length - updates.length);
+    });
 
-        results = db.selectSync(function(record) { return record.lastName === "Smythe"; });
+    it("Selects updated data synchronously", async () => {
+        const results = db.selectSync(r=>r.lastName==="Smythe");
         expect(results.data.sort((a, b) => a.id - b.id)).to.deep.equal(updates);
         expect(results.selected).to.equal(updates.length);
         expect(results.ignored).to.equal(inserts.length - updates.length);
@@ -466,7 +493,13 @@ describe("NJODB sync tests", () => {
         const results = db.deleteSync(function(record) { return record.id % 5 === 0; });
         expect(results.deleted).to.equal(deletes.length);
         expect(results.retained).to.equal(inserts.length - deletes.length);
-    })
+    });
+
+    it("Selects deleted data synchronously", async () => {
+        const results = db.selectSync(r=>r.id%5===0);
+        expect(results.selected).to.equal(0);
+        expect(results.ignored).to.equal(inserts.length - deletes.length);
+    });
 
     it("Grows database synchronously", () => {
         const results = db.growSync();
@@ -507,18 +540,132 @@ describe("NJODB sync tests", () => {
         expect(fs.existsSync(path.join(defaults.root, "tmp"))).to.equal(false);
     });
 
+    it("Creates a database in CWD and then drops it synchronously", () => {
+        const db = new njodb.Database();
+        expect(fs.existsSync(path.join(process.cwd(), "njodb.properties"))).to.equal(true);
+        expect(fs.existsSync(path.join(process.cwd(), "data"))).to.equal(true);
+        expect(fs.existsSync(path.join(process.cwd(), "tmp"))).to.equal(true);
+
+        db.dropSync();
+    });
+
+    it("Creates a database in a directory that doesn't exist and then drops it synchronously", () => {
+        const db = new njodb.Database("./new_root");
+        expect(fs.existsSync(path.join("./new_root", "njodb.properties"))).to.equal(true);
+        expect(fs.existsSync(path.join("./new_root", "data"))).to.equal(true);
+        expect(fs.existsSync(path.join("./new_root", "tmp"))).to.equal(true);
+
+        db.dropSync();
+        fs.rmdirSync("./new_root");
+    });
 });
 
 describe("NJODB error tests", () => {
 
-    it("Tries to set bad properties", () => {
+    it("Tries to use bad JSON in properties file", () => {
+        fs.writeFileSync(path.join(__dirname, "njodb.properties"), badJSON, "utf8");
+
         let error = null;
 
         try {
             db = new njodb.Database(__dirname);
-            db.setProperties(badProperties);
         } catch(e) {
             error = e;
+        }
+
+        expect(error).to.be.an("Error");
+
+        var properties = Object.assign({}, defaults);
+        delete properties.root;
+        delete properties.datapath;
+        delete properties.temppath;
+
+        fs.writeFileSync(path.join(__dirname, "njodb.properties"), JSON.stringify(properties), "utf8");
+    });
+
+    it("Tries to create a database using a bad path", () => {
+        let error = null;
+
+        try {
+            new njodb.Database(0);
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            new njodb.Database("");
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            new njodb.Database("/path/that/doesnt/exist");
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to set bad properties", () => {
+        let error = null;
+
+        db = new njodb.Database(__dirname);
+
+        try {
+            db.setProperties("non-object");
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            db.setProperties({datadir: 5});
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            db.setProperties({datadir: "data", dataname: ""});
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            db.setProperties({datadir: "data", dataname: "data", datastores: "five"});
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            db.setProperties({datadir: "data", dataname: "data", datastores: -1});
+        } catch(e) {
+            error = e;
+
         }
 
         expect(error).to.be.an("Error");
@@ -526,6 +673,36 @@ describe("NJODB error tests", () => {
         var properties = {};
         Object.keys(db.getProperties()).sort().forEach(p => properties[p] = db.properties[p]);
         expect(properties).to.deep.equal(defaults);
+    });
+
+    it("Tries to insert data from a file using bad information}", () => {
+        let error = null;
+
+        try {
+            db.insertFileSync(0);
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            db.insertFileSync("");
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+        error = null;
+
+        try {
+            db.insertFileSync("/path/to/a/nonexistent/file");
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
     });
 
     it("Inserts data synchronously", () => {
@@ -588,6 +765,40 @@ describe("NJODB error tests", () => {
         expect(error).to.be.an("Error");
     });
 
+    it("Tries to select records with a selecter function that doesn't return a boolean", () => {
+        let error = null;
+
+        try {
+            db.selectSync(()=>{return {};});
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to select records with a selecter function that throws an error", () => {
+        const results = db.selectSync(()=>{throw new Error("Test error");});
+        expect(results.selected).to.equal(0);
+    });
+
+    it("Tries to select records with a projecter function that throws an error", () => {
+        const results = db.selectSync(()=>true, ()=>{throw new Error("Test error");});
+        results.data.forEach(data => expect(data).to.equal(undefined));
+    });
+
+    it("Tries to select records with a projecter function that doesn't return an object", () => {
+        let error = null;
+
+        try {
+            db.selectSync(()=>true, ()=>[]);
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
     it("Aggregates data asynchronously and finds bad record", async () => {
         return db.aggregate(function() { return true; }, function(record) { return record.id; }).then(results => {
             expect(results.errors).to.equal(1);
@@ -610,11 +821,45 @@ describe("NJODB error tests", () => {
         expect(results.errors).to.equal(1);
     });
 
-    it("Tries to use aggregate indexer that doesn't return a value", () => {
+    it("Tries to update records with an updater function that doesn't return an object", () => {
         let error = null;
 
         try {
-            db.aggregateSync(() => true, function(record) { record.state !== undefined});
+            db.updateSync(()=>true, r=>{r.region==="New Region"; return "New Region"});
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to update records with an updater function that throws an error", () => {
+        const results = db.updateSync(()=>true, ()=>{throw new Error("Test error");});
+        expect(results.updated).to.equal(0);
+    });
+
+    it("Tries to aggregate data using an indexer that doesn't return a value", () => {
+        let error = null;
+
+        try {
+            db.aggregateSync(record => record.id <= 10, function(record) { record.state !== undefined; });
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to aggregates data with an indexer that throws an error", async () => {
+        return db.aggregate(() => true, () => {throw new Error("Test error")}).catch(error => {
+            expect(error).to.be.an("Error");
+        });
+    });
+
+    it("Tries to aggregates data with a projecter that doesn't return an object", async () => {
+        let error = null;
+        try {
+            db.aggregateSync(() => true, r => r.id, () => []);
         } catch(e) {
             error = e;
         }
