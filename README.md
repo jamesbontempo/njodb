@@ -37,9 +37,9 @@
   - [insert](#insert) / [insertSync](#insertSync)
   - [insertFile](#insertFile) / [insertFileSync](#insertFileSync)
   - [select](#select) / [selectSync](#selectSync)
-  - [aggregate](#aggregate) / [aggregateSync](#aggregateSync)
   - [update](#update) / [updateSync](#updateSync)
   - [delete](#delete) / [deleteSync](#deleteSync)
+  - [aggregate](#aggregate) / [aggregateSync](#aggregateSync)
 - [Finding and fixing problematic data](#finding-and-fixing-problematic-data)
 
 ## Install
@@ -83,14 +83,14 @@ const data = [
 
 Insert them into the database:
 ```js
-db.insert(data).then( /* do something */ );
+db.insert(data).then(results => /* do something */ );
 ```
 
 Select some records from the database by supplying a function to find matches:
 ```js
 db.select(
     record => record.id === 1 || record.name === "Steve"
-).then( /* do something */ );
+).then(results => /* do something */ );
 ```
 
 Update some records in the database by supplying a function to find matches and another function to update them:
@@ -98,19 +98,19 @@ Update some records in the database by supplying a function to find matches and 
 db.update(
     record => record.name === "James",
     record => { record.nickname = "Bulldog"; return record; }
-).then( /* do something */ );
+).then(results => /* do something */ );
 ```
 
 Delete some records from the database by supplying a function to find matches:
 ```js
 db.delete(
     record => record.modified < Date.now()
-).then( /* do something */ );
+).then(results => /* do something */ );
 ```
 
 Delete the database:
 ```js
-db.drop().then( /* do something */ );
+db.drop().then(results => /* do something */ );
 ```
 
 ## Constructor
@@ -299,7 +299,11 @@ Name|Type|Description
 `elapsed`|number|The amount of time in milliseconds required to execute the `insert`
 `details`|array|An array of insertion results for each individual `datastore`
 
-An example data file, `data.json`, is included in the `test` subdirectory. Among many valid records, it also includes blank lines and a malformed JSON object.
+An example data file, `data.json`, is included in the `test` subdirectory. Among many valid records, it also includes blank lines and a malformed JSON object. To insert its data into the `database`:
+
+```js
+db.insertFile("./test/data.json").then(results => /* do something */ );
+```
 
 ### insertFileSync
 
@@ -347,6 +351,67 @@ db.select(
 `selectSync(selecter [, projector])`
 
 A synchronous version of `select`.
+
+### update
+
+`update(selecter, updater)`
+
+Updates data in the `Database`.
+
+Parameters:
+
+Name|Type|Description
+----|----|-----------
+`selecter`|function|A function that returns a boolean that will be used to identify the records that should be updated
+`updater`|function|A function that applies an update to a selected record and returns it
+
+Resolves with an object containing results from the `update`:
+
+Name|Type|Description
+----|----|-----------
+`updated`|number|The number of objects updated in the `Database`
+`unchanged`|number|The number of objects that were not updated in the `Database`
+`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
+`start`|date|The timestamp of when the updates began
+`end`|date|The timestamp of when the updates finished
+`elapsed`|number|The amount of time in milliseconds required to execute the `update`
+`details`|array|An array of update results, including error details, for each individual `datastore`
+
+### updateSync
+
+`updateSync(selecter, updater)`
+
+A synchronous version of `update`
+
+### delete
+
+`delete(selecter)`
+
+Deletes data from the `Database`.
+
+Parameters:
+
+Name|Type|Description
+----|----|-----------
+`selecter`|function|A function that returns a boolean that will be used to identify the records that should be deleted
+
+Resolves with an object containing results from the `delete`:
+
+Name|Type|Description
+----|----|-----------
+`deleted`|number|The number of objects deleted from the `Database`
+`retained`|number|The number of objects that were not deleted from the `Database`
+`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
+`start`|date|The timestamp of when the deletions began
+`end`|date|The timestamp of when the deletions finished
+`elapsed`|number|The amount of time in milliseconds required to execute the `delete`
+`details`|array|An array of deletion results, including error details, for each individual `datastore`
+
+### deleteSync
+
+`deleteSync(selecter)`
+
+A synchronous version of `delete`.
 
 ### aggregate
 
@@ -477,68 +542,6 @@ Example aggregate data array:
 `aggregate(selecter, indexer [, projecter])`
 
 A synchronous version of `aggregate`.
-
-### update
-
-`update(selecter, updater)`
-
-Updates data in the `Database`.
-
-Parameters:
-
-Name|Type|Description
-----|----|-----------
-`selecter`|function|A function that returns a boolean that will be used to identify the records that should be updated
-`updater`|function|A function that applies an update to a selected record and returns it
-
-Resolves with an object containing results from the `update`:
-
-Name|Type|Description
-----|----|-----------
-`updated`|number|The number of objects updated in the `Database`
-`unchanged`|number|The number of objects that were not updated in the `Database`
-`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
-`start`|date|The timestamp of when the updates began
-`end`|date|The timestamp of when the updates finished
-`elapsed`|number|The amount of time in milliseconds required to execute the `update`
-`details`|array|An array of update results, including error details, for each individual `datastore`
-
-### updateSync
-
-`updateSync(selecter, updater)`
-
-A synchronous version of `update`
-
-### delete
-
-`delete(selecter)`
-
-Deletes data from the `Database`.
-
-Parameters:
-
-Name|Type|Description
-----|----|-----------
-`selecter`|function|A function that returns a boolean that will be used to identify the records that should be deleted
-
-Resolves with an object containing results from the `delete`:
-
-Name|Type|Description
-----|----|-----------
-`deleted`|number|The number of objects deleted from the `Database`
-`retained`|number|The number of objects that were not deleted from the `Database`
-`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
-`start`|date|The timestamp of when the deletions began
-`end`|date|The timestamp of when the deletions finished
-`elapsed`|number|The amount of time in milliseconds required to execute the `delete`
-`details`|array|An array of deletion results, including error details, for each individual `datastore`
-
-### deleteSync
-
-`deleteSync(selecter)`
-
-A synchronous version of `delete`.
-
 
 ## Finding and fixing problematic data
 
