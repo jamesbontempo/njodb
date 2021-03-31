@@ -1,6 +1,6 @@
 {
   "name": "njodb",
-  "version": "0.4.13",
+  "version": "0.4.14",
   "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "mocha",
-    "coverage": "nyc npm run test"
+    "coverage": "nyc npm run test",
+    "report-coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov"
   },
   "repository": {
     "type": "git",
