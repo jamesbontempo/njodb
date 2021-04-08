@@ -1,6 +1,6 @@
 {
   "name": "njodb",
-  "version": "0.4.15",
+  "version": "0.4.16",
   "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
@@ -18,7 +18,14 @@
   "keywords": [
     "JSON",
     "object",
-    "database"
+    "database",
+    "nosql",
+    "persistent",
+    "partition",
+    "concurrent",
+    "db",
+    "data",
+    "storage"
   ],
   "author": {
     "name": "James BonTempo",

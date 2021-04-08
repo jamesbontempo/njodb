@@ -528,8 +528,7 @@ Example aggregate data array:
                 field: "firstName",
                 data: {
                     min: "James",
-                    max: "Robert",
-                    count: 50
+                    max: "Robert"
                 }
             }
         ]
