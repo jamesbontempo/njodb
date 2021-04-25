@@ -245,7 +245,7 @@ class Database {
         var records = [];
 
         for (let i = 0; i < this.properties.datastores; i++) {
-            records[i] = [];
+            records[i] = '';
         }
 
         for (let i = 0; i < data.length; i++) {
