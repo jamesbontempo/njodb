@@ -245,7 +245,7 @@ class Database {
         var records = [];
 
         for (let i = 0; i < this.properties.datastores; i++) {
-            records[i] = '';
+            records[i] = "";
         }
 
         for (let i = 0; i < data.length; i++) {
@@ -255,10 +255,12 @@ class Database {
         const randomizer = Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
 
         for (var j = 0; j < records.length; j++) {
-            const storenumber = randomizer.next();
-            const storename = [this.properties.dataname, storenumber, "json"].join(".");
-            const storepath = join(this.properties.datapath, storename)
-            promises.push(insertStoreData(storepath, records[j], this.properties.lockoptions));
+            if (records[j] !== "") {
+                const storenumber = randomizer.next();
+                const storename = [this.properties.dataname, storenumber, "json"].join(".");
+                const storepath = join(this.properties.datapath, storename)
+                promises.push(insertStoreData(storepath, records[j], this.properties.lockoptions));
+            }
         }
 
         const results = await Promise.all(promises);
@@ -275,7 +277,7 @@ class Database {
         var records = [];
 
         for (let i = 0; i < this.properties.datastores; i++) {
-            records[i] = [];
+            records[i] = "";
         }
 
         for (let i = 0; i < data.length; i++) {
@@ -285,10 +287,12 @@ class Database {
         const randomizer = Randomizer(Array.from(Array(this.properties.datastores).keys()), false);
 
         for (var j = 0; j < records.length; j++) {
-            const storenumber = randomizer.next();
-            const storename = [this.properties.dataname, storenumber, "json"].join(".");
-            const storepath = join(this.properties.datapath, storename)
-            results.push(insertStoreDataSync(storepath, records[j], this.properties.lockoptions));
+            if (records[j] !== "") {
+                const storenumber = randomizer.next();
+                const storename = [this.properties.dataname, storenumber, "json"].join(".");
+                const storepath = join(this.properties.datapath, storename)
+                results.push(insertStoreDataSync(storepath, records[j], this.properties.lockoptions));
+            }
         }
 
         this.properties.storenames = getStoreNamesSync(this.properties.datapath, this.properties.dataname);
