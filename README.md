@@ -6,7 +6,7 @@
 
 ## What makes `njodb` different than other Node JSON object databases?
 
-**Persistence** - Data is saved to the file system so that it remains after the application that created it is no longer running, unlike many of the existing in-memory solutions. This persistence also allows data to be made available to other applications.
+**Persistence** - Data is saved to the file system so that it remains after the application that created it is no longer running, unlike the many existing in-memory solutions. This persistence also allows data to be made available to other applications.
 
 **Asynchronous and streaming** - By default, all methods are asynchronous and non-blocking, and also use read and write streams, to make data access and manipulation efficient. Synchronous methods are also provided for those cases where they are desired or  appropriate.
 
