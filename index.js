@@ -82,8 +82,8 @@ const saveProperties = (root, properties) => {
 
 class Database {
 
-    constructor(root) {
-        this.properties = {};
+    constructor(root, userProperties = {}) {
+        this.properties = {}
 
         if (root !== undefined && root !== null) {
             validateName(root);
@@ -99,7 +99,7 @@ class Database {
         if (existsSync(propertiesFile)) {
             this.setProperties(JSON.parse(readFileSync(propertiesFile)));
         } else {
-            this.setProperties(defaults);
+            this.setProperties(this.deepAssignProperties(defaults, userProperties));
         }
 
         if (!existsSync(this.properties.datapath)) mkdirSync(this.properties.datapath);
@@ -130,6 +130,19 @@ class Database {
         saveProperties(this.properties.root, this.properties);
 
         return this.properties;
+    }
+
+    deepAssignProperties(properties, userProperties) {
+        if (!userProperties) return properties;
+        validateObject(userProperties);
+
+        var target = Object.assign({}, properties);
+        for (let key of Object.keys(userProperties)) {
+            if (!target.hasOwnProperty(key)) continue;
+            if (typeof userProperties[key] !== 'object') target[key] = userProperties[key];
+            else this.deepAssignProperties(target[key], userProperties[key]);
+        }
+        return target;
     }
 
     async stats() {
@@ -324,8 +337,8 @@ class Database {
             if (record.length > 0) {
                 try {
                     records.push(JSON.parse(record));
-                } catch(error) {
-                    results.errors.push({error: error.message, line: results.lines, data: record});
+                } catch (error) {
+                    results.errors.push({ error: error.message, line: results.lines, data: record });
                 }
             } else {
                 results.blanks++;
