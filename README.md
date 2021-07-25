@@ -120,16 +120,17 @@ Parameters:
 
 Name|Type|Description|Default
 ----|----|-----------|-------
-`root`|string|path to the root directory of the `Database`|`process.cwd()`
+`root`|string|Path to the root directory of the `Database`|`process.cwd()`
+`properties`|object|User-specific properties to set for the `Database`|`{}` (see [Database properties](#database-properties))
 
-If an `njodb.properties` file already exists in the `root` directory, a connection to the existing `Database` will be created. If the `root` directory does not exist it will be created, along with a default `njodb.properties` file (see [Database properties](#database-properties) below). If the data and temp directories do not exist, they will be created.
+If an `njodb.properties` file already exists in the `root` directory, a connection to the existing `Database` will be created. If the `root` directory does not exist it will be created. If no user-specific properties are supplied, an `njodb.properties` file will be created using default values; otherwise, the user-supplied properties will be merged with the default values (see [Database properties](#database-properties) below). If the data and temp directories do not exist, they will be created.
 
 Example:
 
 ```js
 const db = new njodb.Database() // created in or connected to the current directory
 
-const db = new njodb.Database("/path/to/some/other/place") // created or connected to elsewhere
+const db = new njodb.Database("/path/to/some/other/place", {datadir: "mydata", datastores: 2}) // created or connected to elsewhere with user-supplied properties
 ```
 
 ### Database properties

@@ -43,6 +43,28 @@ const properties = {
     "tempdir": "tmp"
 };
 
+const userProperties = {
+    "datadir": "mydata",
+    "dataname": "data",
+    "datapath": path.join(__dirname, "mydata"),
+    "datastores": 2,
+    "lockoptions": {
+        "stale": 1000,
+        "update": 1000,
+        "retries": {
+            "retries": 500,
+            "minTimeout": 250,
+            "maxTimeout": 5000,
+            "factor": 0.15,
+            "randomize": false
+        }
+    },
+    "root": __dirname,
+    "storenames": [],
+    "tempdir": "tmp",
+    "temppath": path.join(__dirname, "tmp")
+};
+
 const badJSON = "{\"datadir: \"data\",\"dataname\": \"data\",\"datastores\": 5,\"tempdir\": \"tmp\"}";
 
 const firstNames = ["James", "John", "Robert", "Michael", "William", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth"];
@@ -331,7 +353,6 @@ describe("NJODB async tests", () => {
             expect(results.dropped).to.equal(true);
         });
     });
-
 });
 
 describe("NJODB sync tests", () => {
@@ -540,6 +561,15 @@ describe("NJODB sync tests", () => {
         expect(fs.existsSync(path.join(defaults.root, "tmp"))).to.equal(false);
     });
 
+    it("Creates a new NJODB instance with user-supplied properties and then drops it synchronously", () => {
+        db = new njodb.Database(__dirname, {datadir: "mydata", datastores: 2, lockoptions: {stale: 1000, retries: {retries: 500}}});
+        expect(db.getProperties()).to.deep.equal(userProperties);
+        expect(fs.existsSync(path.join(defaults.root, "mydata"))).to.equal(true);
+        expect(fs.existsSync(path.join(defaults.root, "tmp"))).to.equal(true);
+
+        db.dropSync();
+    });
+
     it("Creates a database in CWD and then drops it synchronously", () => {
         const db = new njodb.Database();
         expect(fs.existsSync(path.join(process.cwd(), "njodb.properties"))).to.equal(true);
@@ -608,6 +638,19 @@ describe("NJODB error tests", () => {
 
         try {
             new njodb.Database("/path/that/doesnt/exist");
+        } catch(e) {
+            error = e;
+
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to create a database using bad user-supplied properties", () => {
+        let error = null;
+
+        try {
+            new njodb.Database(__dirname, "test");
         } catch(e) {
             error = e;
 

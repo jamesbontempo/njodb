@@ -67,6 +67,22 @@ const defaults = {
     }
 };
 
+const mergeProperties = (defaults, userProperties) => {
+    var target = Object.assign({}, defaults);
+
+    for (let key of Object.keys(userProperties)) {
+        if (Object.prototype.hasOwnProperty.call(target, key)) {
+            if (typeof userProperties[key] !== 'object' && !Array.isArray(userProperties[key])) {
+                Object.assign(target, {[key]: userProperties[key]});
+            } else {
+                target[key] = mergeProperties(target[key], userProperties[key]);
+            }
+        }
+    }
+
+    return target;
+}
+
 const saveProperties = (root, properties) => {
     properties = {
         "datadir": properties.datadir,
@@ -82,7 +98,9 @@ const saveProperties = (root, properties) => {
 
 class Database {
 
-    constructor(root) {
+    constructor(root, properties = {}) {
+        validateObject(properties);
+
         this.properties = {};
 
         if (root !== undefined && root !== null) {
@@ -99,7 +117,7 @@ class Database {
         if (existsSync(propertiesFile)) {
             this.setProperties(JSON.parse(readFileSync(propertiesFile)));
         } else {
-            this.setProperties(defaults);
+            this.setProperties(mergeProperties(defaults, properties));
         }
 
         if (!existsSync(this.properties.datapath)) mkdirSync(this.properties.datapath);
