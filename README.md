@@ -10,7 +10,7 @@
 
 **Asynchronous and streaming** - By default, all methods are asynchronous and non-blocking, and also use read and write streams, to make data access and manipulation efficient. Synchronous methods are also provided for those cases where they are desired or  appropriate.
 
-**JSON records, not JSON files** - Records are stored as individual lines of JSON objects in a file, so a read stream can be used to retrieve data rapidly, parse it in small chunks, and dispense with it when done. This removes the time and memory overhead required by solutions that store data as a single, monolithic JSON object. They must read all of that data into memory, and then parse all of it, before allowing you to using any of it.
+**JSON records, not JSON files** - Records are stored as individual lines of JSON objects in a file, so a read stream can be used to retrieve data rapidly, parse it in small chunks, and dispense with it when done. This removes the time and memory overhead required by solutions that store data as a single, monolithic JSON object. They must read all of that data into memory, and then parse all of it, before allowing you to use any of it.
 
 **Completely schemaless** - While the JSON data itself is schemaless, it is also the case that data is not siloed into tables, or forced into collections, so the entire database, from top to bottom, is schemaless, not just the data. For a user or application, this means that there is no need to know anything about the database structure, only what data is being sought.
 
