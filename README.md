@@ -8,7 +8,7 @@
 
 **Persistence** - Data is saved to the file system so that it remains after the application that created it is no longer running, unlike the many existing in-memory solutions. This persistence also allows data to be made available to other applications.
 
-**Asynchronous and streaming** - By default, all methods are asynchronous and non-blocking, and also use read and write streams, to make data access and manipulation efficient. Synchronous methods are also provided for those cases where they are desired or  appropriate.
+**Asynchronous and streaming** - By default, all methods are asynchronous and non-blocking, and also use read and write streams, to make data access and manipulation efficient. Synchronous methods are also provided for those cases where they are desired or appropriate.
 
 **JSON records, not JSON files** - Records are stored as individual lines of JSON objects in a file, so a read stream can be used to retrieve data rapidly, parse it in small chunks, and dispense with it when done. This removes the time and memory overhead required by solutions that store data as a single, monolithic JSON object. They must read all of that data into memory, and then parse all of it, before allowing you to use any of it.
 
