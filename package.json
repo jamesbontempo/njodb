@@ -1,6 +1,6 @@
 {
   "name": "njodb",
-  "version": "0.4.22",
+  "version": "0.4.23",
   "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
@@ -34,8 +34,8 @@
   "license": "MIT",
   "devDependencies": {
     "chai": "^4.3.0",
-    "eslint": "^7.19.0",
-    "mocha": "^8.3.0",
+    "eslint": "^8.1.0",
+    "mocha": "^9.1.3",
     "nyc": "^15.1.0"
   },
   "dependencies": {
