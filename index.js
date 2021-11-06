@@ -5,7 +5,7 @@ const {
     mkdirSync,
     readFileSync,
     writeFileSync
-} = require("fs");
+} = require("graceful-fs");
 
 const {
     join,
@@ -95,6 +95,14 @@ const saveProperties = (root, properties) => {
     writeFileSync(propertiesFile, JSON.stringify(properties, null, 4));
     return properties;
 }
+
+process.on("uncaughtException", error => {
+    if (error.code === "ECOMPROMISED") {
+        console.error(Object.assign(new Error("Stale lock or attempt to update it after release"), {code: error.code}));
+    } else {
+        throw error;
+    }
+});
 
 class Database {
 
