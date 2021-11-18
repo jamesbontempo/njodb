@@ -332,7 +332,7 @@ Name|Type|Description
 `data`|array|An array of objects selected from the `Database`
 `selected`|number|The number of objects selected from the `Database`
 `ignored`|number|The number of objects that were not selected from the `Database`
-`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
+`errors`|array|An array of problematic (i.e., un-parseable) records in the `Database`
 `start`|date|The timestamp of when the selections began
 `end`|date|The timestamp of when the selections finished
 `elapsed`|number|The amount of time in milliseconds required to execute the `select`
@@ -372,7 +372,7 @@ Name|Type|Description
 ----|----|-----------
 `updated`|number|The number of objects updated in the `Database`
 `unchanged`|number|The number of objects that were not updated in the `Database`
-`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
+`errors`|array|An array of problematic (i.e., un-parseable) records in the `Database` or records that were unable to be updated
 `start`|date|The timestamp of when the updates began
 `end`|date|The timestamp of when the updates finished
 `elapsed`|number|The amount of time in milliseconds required to execute the `update`
@@ -402,7 +402,7 @@ Name|Type|Description
 ----|----|-----------
 `deleted`|number|The number of objects deleted from the `Database`
 `retained`|number|The number of objects that were not deleted from the `Database`
-`errors`|number|The number of problematic (i.e., un-parseable) records in the `Database`
+`errors`|array|An array of problematic (i.e., un-parseable) records in the `Database` or records that were unable to be deleted
 `start`|date|The timestamp of when the deletions began
 `end`|date|The timestamp of when the deletions finished
 `elapsed`|number|The amount of time in milliseconds required to execute the `delete`

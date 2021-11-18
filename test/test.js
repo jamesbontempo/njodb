@@ -764,24 +764,24 @@ describe("NJODB error tests", () => {
     it("Gets database stats asynchronously and finds bad record", async () => {
         return db.stats().then(results => {
             expect(results.records).to.equal(inserts.length * 2);
-            expect(results.errors).to.equal(1);
+            expect(results.errors.length).to.equal(1);
         });
     })
 
     it("Gets database stats synchronously and finds bad record", () => {
         const results = db.statsSync();
-        expect(results.errors).to.equal(1);
+        expect(results.errors.length).to.equal(1);
     })
 
     it("Selects data asynchronously and finds bad record", async () => {
         return db.select(function() { return true; }).then(results => {
-            expect(results.errors).to.equal(1);
+            expect(results.errors.length).to.equal(1);
         });
     });
 
     it("Selects data synchronously and finds bad record", () => {
         const results = db.selectSync(function() { return true; });
-        expect(results.errors).to.equal(1);
+        expect(results.errors.length).to.equal(1);
     });
 
     it("Tries to insert data that is not an array", () => {
@@ -844,24 +844,24 @@ describe("NJODB error tests", () => {
 
     it("Aggregates data asynchronously and finds bad record", async () => {
         return db.aggregate(function() { return true; }, function(record) { return record.id; }).then(results => {
-            expect(results.errors).to.equal(1);
+            expect(results.errors.length).to.equal(1);
         });
     });
 
     it("Aggregates data synchronously and finds bad record", () => {
         const results = db.aggregateSync(function() { return true; }, function(record) { return record.id; });
-        expect(results.errors).to.equal(1);
+        expect(results.errors.length).to.equal(1);
     });
 
     it("Updates data asynchronously and finds bad record", async () => {
         return db.update(function(record) { return record.lastName === "Smith"; }, function(record) { record.lastName = "Smythe"; return record; }).then(results => {
-            expect(results.errors).to.equal(1);
+            expect(results.errors.length).to.equal(1);
         });
     });
 
     it("Updates data synchronously and finds bad record", () => {
         const results = db.updateSync(function(record) { return record.lastName === "Smythe"; }, function(record) { record.lastName = "Smithe"; return record; });
-        expect(results.errors).to.equal(1);
+        expect(results.errors.length).to.equal(1);
     });
 
     it("Tries to update records with an updater function that doesn't return an object", () => {
@@ -975,12 +975,12 @@ describe("NJODB error tests", () => {
 
     it("Deletes data synchronously and finds bad record", () => {
         const results = db.deleteSync(function(record) { return record.firstName === "James"; });
-        expect(results.errors).to.equal(1);
+        expect(results.errors.length).to.equal(1);
     });
 
     it("Deletes data asynchronously and finds bad record", async () => {
         return db.delete(function(record) { return record.lastName === "Williams"; }).then(results => {
-            expect(results.errors).to.equal(1);
+            expect(results.errors.length).to.equal(1);
         });
     });
 
