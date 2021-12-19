@@ -11,6 +11,7 @@
     "coverage": "nyc npm run test",
     "report-coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov"
   },
+  "types": "index.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/jamesbontempo/njodb.git"
