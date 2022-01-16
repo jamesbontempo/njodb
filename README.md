@@ -370,6 +370,7 @@ Resolves with an object containing results from the `update`:
 
 Name|Type|Description
 ----|----|-----------
+`selected`|number|The number of objects selected from the `Database` for updating
 `updated`|number|The number of objects updated in the `Database`
 `unchanged`|number|The number of objects that were not updated in the `Database`
 `errors`|array|An array of problematic (i.e., un-parseable) records in the `Database` or records that were unable to be updated
