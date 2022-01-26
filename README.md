@@ -546,9 +546,11 @@ A synchronous version of `aggregate`.
 
 ## Finding and fixing problematic data
 
-Many methods return information about problematic records encountered (i.e., records that are not parseable using `JSON.parse()`); both a count of them, as well as details about them in the `details` array. The objects in the `details` array - one for each `datastore` - contain an `errors` array that is a collection of objects about problematic records in the `datastore`. Each error object includes the line of the `datastore` file where the problematic record was found as well as a copy of the record itself. With this information, if one wants to address these problematic data they can simply load the `datastore` file in a text editor and either correct the record or remove it.
+Many methods return information about problematic records encountered (e.g., records that are not parseable using `JSON.parse()`, or ones that couldn't be updated or deleted); both a count of them, as well as details about them in the `details` array. The objects in the `details` array - one for each `datastore` - contain an `errors` array that is a collection of objects about problematic records.
 
-Here is an example of the `details` for a `datastore` that contains a problematic record. As you can see, the record is on the tenth line of the file, and the problem is that the `lastname` key name is missing an enclosing quote. Simply adding the quote fixes the record.
+For un-parseable records, each error object includes the line of the `datastore` file where the problematic record was found as well as a copy of the record itself. With this information, if one wants to address these problematic data they can simply load the `datastore` file in a text editor and either correct the record or remove it. For records that couldn't be deleted or updated, each error object includes a copy of the record itself. With this information, one could make another attempt to update or delete the record(s), or otherwise handle the failure.
+
+Here is an example of the `details` for a `datastore` that contains an un-parseable record. As you can see, the record is on the tenth line of the file, and the problem is that the `lastname` key name is missing an enclosing quote. Simply adding the quote fixes the record.
 
 ```js
 {
