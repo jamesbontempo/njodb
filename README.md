@@ -1,6 +1,6 @@
 # njodb
 
-![NPM Version](https://img.shields.io/github/package-json/v/jamesbontempo/njodb?color=blue) ![Codecov Coverage](https://img.shields.io/codecov/c/github/jamesbontempo/njodb/&lt;master>.svg?style=flat) ![David Dependencies](https://david-dm.org/jamesbontempo/njodb.svg) ![License](https://img.shields.io/github/license/jamesbontempo/njodb?color=red)
+![Version](https://img.shields.io/github/package-json/v/jamesbontempo/njodb?color=blue) ![Coverage](https://img.shields.io/codecov/c/github/jamesbontempo/njodb/&lt;master>.svg?style=flat) ![Dependencies](https://img.shields.io/librariesio/release/npm/njodb) ![License](https://img.shields.io/github/license/jamesbontempo/njodb?color=red)
 
 `njodb` is a persistent, partitioned, concurrency-controlled, Node JSON object database. Data is written to the file system and distributed across multiple files that are protected by read and write locks. By default, all methods are asynchronous and use read/write streams to improve performance and reduce memory requirements (this should be particularly useful for large databases).
 
