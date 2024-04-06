@@ -8,17 +8,6 @@ const defaults = {
     "dataname": "data",
     "datapath": path.join(__dirname, "data"),
     "datastores": 5,
-    "lockoptions": {
-        "stale": 5000,
-        "update": 1000,
-        "retries": {
-            "retries": 5000,
-            "minTimeout": 250,
-            "maxTimeout": 5000,
-            "factor": 0.15,
-            "randomize": false
-        }
-    },
     "root": __dirname,
     "storenames": [],
     "tempdir": "tmp",
@@ -29,17 +18,6 @@ const properties = {
     "datadir": "data",
     "dataname": "data",
     "datastores": 5,
-    "lockoptions": {
-        "stale": 5000,
-        "update": 1000,
-        "retries": {
-            "retries": 5000,
-            "minTimeout": 250,
-            "maxTimeout": 5000,
-            "factor": 0.15,
-            "randomize": false
-        }
-    },
     "tempdir": "tmp"
 };
 
@@ -48,17 +26,6 @@ const userProperties = {
     "dataname": "data",
     "datapath": path.join(__dirname, "mydata"),
     "datastores": 2,
-    "lockoptions": {
-        "stale": 1000,
-        "update": 1000,
-        "retries": {
-            "retries": 500,
-            "minTimeout": 250,
-            "maxTimeout": 5000,
-            "factor": 0.15,
-            "randomize": false
-        }
-    },
     "root": __dirname,
     "storenames": [],
     "tempdir": "tmp",
@@ -562,7 +529,7 @@ describe("NJODB sync tests", () => {
     });
 
     it("Creates a new NJODB instance with user-supplied properties and then drops it synchronously", () => {
-        db = new njodb.Database(__dirname, {datadir: "mydata", datastores: 2, lockoptions: {stale: 1000, retries: {retries: 500}}});
+        db = new njodb.Database(__dirname, {datadir: "mydata", datastores: 2});
         expect(db.getProperties()).to.deep.equal(userProperties);
         expect(fs.existsSync(path.join(defaults.root, "mydata"))).to.equal(true);
         expect(fs.existsSync(path.join(defaults.root, "tmp"))).to.equal(true);
@@ -821,13 +788,27 @@ describe("NJODB error tests", () => {
     });
 
     it("Tries to select records with a selecter function that throws an error", () => {
-        const results = db.selectSync(()=>{throw new Error("Test error");});
-        expect(results.selected).to.equal(0);
+        let error = null;
+
+        try {
+            db.selectSync(()=>{throw new Error("Test error");});
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
     });
 
     it("Tries to select records with a projecter function that throws an error", () => {
-        const results = db.selectSync(()=>true, ()=>{throw new Error("Test error");});
-        results.data.forEach(data => expect(data).to.equal(undefined));
+        let error = null;
+
+        try {
+            db.selectSync(()=>true, ()=>{throw new Error("Test error");});
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
     });
 
     it("Tries to select records with a projecter function that doesn't return an object", () => {
@@ -877,8 +858,15 @@ describe("NJODB error tests", () => {
     });
 
     it("Tries to update records with an updater function that throws an error", () => {
-        const results = db.updateSync(()=>true, ()=>{throw new Error("Test error");});
-        expect(results.updated).to.equal(0);
+        let error = null;
+
+        try {
+            db.updateSync(()=>true, ()=>{throw new Error("Test error");});
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
     });
 
     it("Tries to aggregate data using an indexer that doesn't return a value", () => {

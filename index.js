@@ -5,7 +5,7 @@ const {
     mkdirSync,
     readFileSync,
     writeFileSync
-} = require("graceful-fs");
+} = require("fs");
 
 const {
     join,
@@ -34,11 +34,11 @@ const {
     updateStoreDataSync
 } = require("./lib/njodb");
 
-const {
-    Randomizer,
-    Reducer,
-    Result
-} = require("./lib/objects");
+const { Randomizer } = require("./lib/randomizer");
+
+const { Result } = require("./lib/result");
+
+const { Reducer } = require("./lib/reducer");
 
 const {
     validateArray,
@@ -52,19 +52,8 @@ const {
 const defaults = {
     "datadir": "data",
     "dataname": "data",
-    "datastores": 5,
-    "tempdir": "tmp",
-    "lockoptions": {
-        "stale": 5000,
-        "update": 1000,
-        "retries": {
-            "retries": 5000,
-            "minTimeout": 250,
-            "maxTimeout": 5000,
-            "factor": 0.15,
-            "randomize": false
-        }
-    }
+    "datastores": 3,
+    "tempdir": "tmp"
 };
 
 const mergeProperties = (defaults, userProperties) => {
@@ -89,20 +78,11 @@ const saveProperties = (root, properties) => {
         "dataname": properties.dataname,
         "datastores": properties.datastores,
         "tempdir": properties.tempdir,
-        "lockoptions": properties.lockoptions
     };
     const propertiesFile = join(root, "njodb.properties");
     writeFileSync(propertiesFile, JSON.stringify(properties, null, 4));
     return properties;
 }
-
-process.on("uncaughtException", error => {
-    if (error.code === "ECOMPROMISED") {
-        console.error(Object.assign(new Error("Stale lock or attempt to update it after release"), {code: error.code}));
-    } else {
-        throw error;
-    }
-});
 
 class Database {
 
@@ -149,7 +129,6 @@ class Database {
         this.properties.dataname = (validateName(properties.dataname)) ? properties.dataname : defaults.dataname;
         this.properties.datastores = (validateSize(properties.datastores)) ? properties.datastores : defaults.datastores;
         this.properties.tempdir = (validateName(properties.tempdir)) ? properties.tempdir : defaults.tempdir;
-        this.properties.lockoptions = (validateObject(properties.lockoptions)) ? properties.lockoptions : defaults.lockoptions;
         this.properties.datapath = join(this.properties.root, this.properties.datadir);
         this.properties.temppath = join(this.properties.root, this.properties.tempdir);
 
@@ -169,7 +148,7 @@ class Database {
 
         for (const storename of this.properties.storenames) {
             const storepath = join(this.properties.datapath, storename);
-            promises.push(statsStoreData(storepath, this.properties.lockoptions));
+            promises.push(statsStoreData(storepath));
         }
 
         const results = await Promise.all(promises);
@@ -254,12 +233,12 @@ class Database {
 
     async drop() {
         const results = await dropEverything(this.properties);
-        return Reducer("drop", results);
+        return results;
     }
 
     dropSync() {
         const results = dropEverythingSync(this.properties);
-        return Reducer("drop", results);
+        return results;
     }
 
     // Data manipulation methods
@@ -285,7 +264,7 @@ class Database {
                 const storenumber = randomizer.next();
                 const storename = [this.properties.dataname, storenumber, "json"].join(".");
                 const storepath = join(this.properties.datapath, storename)
-                promises.push(insertStoreData(storepath, records[j], this.properties.lockoptions));
+                promises.push(insertStoreData(storepath, records[j]));
             }
         }
 
@@ -317,7 +296,7 @@ class Database {
                 const storenumber = randomizer.next();
                 const storename = [this.properties.dataname, storenumber, "json"].join(".");
                 const storepath = join(this.properties.datapath, storename)
-                results.push(insertStoreDataSync(storepath, records[j], this.properties.lockoptions));
+                results.push(insertStoreDataSync(storepath, records[j]));
             }
         }
 
@@ -329,7 +308,7 @@ class Database {
     async insertFile(file) {
         validatePath(file);
 
-        const results = await insertFileData(file, this.properties.datapath, this.properties.storenames, this.properties.lockoptions);
+        const results = await insertFileData(file, this.properties.datapath, this.properties.storenames);
 
         return results;
     }
@@ -369,7 +348,7 @@ class Database {
 
         for (const storename of this.properties.storenames) {
             const storepath = join(this.properties.datapath, storename);
-            promises.push(selectStoreData(storepath, match, project, this.properties.lockoptions));
+            promises.push(selectStoreData(storepath, match, project));
         }
 
         const results = await Promise.all(promises);
@@ -400,7 +379,7 @@ class Database {
             const storepath = join(this.properties.datapath, storename);
             const tempstorename = [storename, Date.now(), "tmp"].join(".");
             const tempstorepath = join(this.properties.temppath, tempstorename);
-            promises.push(updateStoreData(storepath, match, update, tempstorepath, this.properties.lockoptions));
+            promises.push(updateStoreData(storepath, match, update, tempstorepath));
         }
 
         const results = await Promise.all(promises);
@@ -432,7 +411,7 @@ class Database {
             const storepath = join(this.properties.datapath, storename);
             const tempstorename = [storename, Date.now(), "tmp"].join(".");
             const tempstorepath = join(this.properties.temppath, tempstorename);
-            promises.push(deleteStoreData(storepath, match, tempstorepath, this.properties.lockoptions));
+            promises.push(deleteStoreData(storepath, match, tempstorepath));
         }
 
         const results = await Promise.all(promises);
@@ -463,7 +442,7 @@ class Database {
 
         for (const storename of this.properties.storenames) {
             const storepath = join(this.properties.datapath, storename);
-            promises.push(aggregateStoreData(storepath, match, index, project, this.properties.lockoptions));
+            promises.push(aggregateStoreData(storepath, match, index, project));
         }
 
         const results = await Promise.all(promises);

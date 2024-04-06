@@ -1,6 +1,6 @@
 {
   "name": "njodb",
-  "version": "0.4.36",
+  "version": "0.5.0",
   "description": "A persistent, partitioned, concurrency-controlled, Node.js JSON object database",
   "main": "index.js",
   "directories": {
@@ -8,6 +8,9 @@
   },
   "scripts": {
     "test": "mocha",
+    "async-test": " mocha -g 'NJODB async tests'",
+    "sync-test": " mocha -g 'NJODB sync tests'",
+    "error-test": " mocha -g 'NJODB error tests'",
     "coverage": "nyc npm run test",
     "report-coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov"
   },
@@ -38,8 +41,5 @@
     "eslint": "^8.51.0",
     "mocha": "^9.2.2",
     "nyc": "^15.1.0"
-  },
-  "dependencies": {
-    "proper-lockfile": "^4.1.2"
   }
 }
