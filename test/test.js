@@ -787,31 +787,39 @@ describe("NJODB error tests", () => {
         expect(error).to.be.an("Error");
     });
 
-    it("Tries to select records with a selecter function that throws an error", () => {
+    it("Tries to select records synchronously with a selecter function that throws an error", () => {
         let error = null;
 
         try {
-            db.selectSync(()=>{throw new Error("Test error");});
+            db.selectSync(()=>{throw new Error();});
         } catch(e) {
             error = e;
         }
 
-        expect(error).to.be.an("Error");
+        expect(error).to.be.an("Error");        
     });
 
-    it("Tries to select records with a projecter function that throws an error", () => {
+    it("Tries to select records asynchronously with a selecter function that throws an error", async () => {
+        return db.select(()=>{throw new Error();}).catch(error => expect(error).to.be.an("Error"));
+    });
+
+    it("Tries to select records synchronously with a projecter function that throws an error", () => {
         let error = null;
 
         try {
-            db.selectSync(()=>true, ()=>{throw new Error("Test error");});
+            db.selectSync(()=>true, ()=>{throw new Error();});
         } catch(e) {
             error = e;
         }
 
-        expect(error).to.be.an("Error");
+        expect(error).to.be.an("Error"); 
     });
 
-    it("Tries to select records with a projecter function that doesn't return an object", () => {
+    it("Tries to select records asynchronously with a projecter function that throws an error", async () => {
+        return db.select(()=>true, ()=>{throw new Error();}).catch(error => expect(error).to.be.an("Error")); 
+    });
+
+    it("Tries to select records synchronously with a projecter function that doesn't return an object", () => {
         let error = null;
 
         try {
@@ -820,7 +828,7 @@ describe("NJODB error tests", () => {
             error = e;
         }
 
-        expect(error).to.be.an("Error");
+        expect(error).to.be.an("Error"); 
     });
 
     it("Aggregates data asynchronously and finds bad record", async () => {
@@ -854,10 +862,10 @@ describe("NJODB error tests", () => {
             error = e;
         }
 
-        expect(error).to.be.an("Error");
+        expect(error).to.be.an("Error"); 
     });
 
-    it("Tries to update records with an updater function that throws an error", () => {
+    it("Tries to update records synchronously with an updater function that throws an error", () => {
         let error = null;
 
         try {
@@ -866,10 +874,14 @@ describe("NJODB error tests", () => {
             error = e;
         }
 
-        expect(error).to.be.an("Error");
+        expect(error).to.be.an("Error"); 
     });
 
-    it("Tries to aggregate data using an indexer that doesn't return a value", () => {
+    it("Tries to update records asynchronously with an updater function that throws an error", async () => {
+        return db.update(()=>true, ()=>{throw new Error("Test error");}).catch(error => expect(error).to.be.an("Error")); 
+    });
+
+    it("Tries to aggregate data synchronously using an indexer that doesn't return a value", () => {
         let error = null;
 
         try {
@@ -881,7 +893,19 @@ describe("NJODB error tests", () => {
         expect(error).to.be.an("Error");
     });
 
-    it("Tries to aggregates data with an indexer that throws an error", async () => {
+    it("Tries to aggregate data synchronously using an indexer that throws an error", () => {
+        let error = null;
+
+        try {
+            db.aggregateSync(() => true, () => {throw new Error("Test error")})
+        } catch(e) {
+            error = e;
+        }
+
+        expect(error).to.be.an("Error");
+    });
+
+    it("Tries to aggregate data asynchronously with an indexer that throws an error", async () => {
         return db.aggregate(() => true, () => {throw new Error("Test error")}).catch(error => {
             expect(error).to.be.an("Error");
         });
