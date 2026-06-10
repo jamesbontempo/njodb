@@ -35,6 +35,7 @@
   "license": "MIT",
   "devDependencies": {
     "chai": "^6.2.2",
+    "codecov": "^3.8.2",
     "eslint": "^10.4.1",
     "mocha": "^11.7.6",
     "nyc": "^18.0.0"
