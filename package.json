@@ -9,7 +9,7 @@
   "scripts": {
     "test": "mocha",
     "coverage": "nyc npm run test",
-    "report-coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecov"
+    "report-coverage": "nyc report --reporter=text-lcov > coverage.lcov && codecovcli --codecov-yml-path codecov.yml upload-process -r jamesbontempo/njodb --sha $(git rev-parse HEAD) --branch $(git rev-parse --abbrev-ref HEAD) -f coverage.lcov"
   },
   "types": "index.d.ts",
   "repository": {
@@ -35,7 +35,6 @@
   "license": "MIT",
   "devDependencies": {
     "chai": "^6.2.2",
-    "codecov": "^3.8.2",
     "eslint": "^10.4.1",
     "mocha": "^11.7.6",
     "nyc": "^18.0.0"
